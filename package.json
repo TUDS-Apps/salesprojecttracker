@@ -10,21 +10,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "firebase": "^10.7.0", /* Updated to a more recent stable version */
+    "firebase": "^10.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.37", /* Consider updating if newer stable versions exist */
-    "@types/react-dom": "^18.2.15", /* Consider updating */
-    "@vitejs/plugin-react": "^4.2.1", /* Updated to a more recent stable version */
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
-    "eslint": "^8.55.0", /* Consider updating */
+    "eslint": "^8.55.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5", /* Updated */
+    "eslint-plugin-react-refresh": "^0.4.5",
     "postcss": "^8.4.32", /* Updated */
-    "tailwindcss": "^3.3.6", /* Updated */
-    "vite": "^5.0.10" /* Updated to a more recent stable version */
+    "tailwindcss": "^3.3.6",
+    "vite": "^5.0.10"
   }
 }
