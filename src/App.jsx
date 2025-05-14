@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { db } from './firebase'; // Make sure firebase.js is in the src folder
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore"; // Added doc for individual deletion
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore"; 
 
 // Tailwind CSS is assumed to be available globally.
 
@@ -16,7 +16,7 @@ const SALESPERSONS = [
     { id: 'shane', name: 'Shane', initials: 'SH' },
     { id: 'steve', name: 'Steve', initials: 'ST' },
     { id: 'wade', name: 'Wade', initials: 'WA' },
-    { id: 'sam', name: 'Sam', initials: 'SA' }, // Added Sam
+    { id: 'sam', name: 'Sam', initials: 'SA' }, 
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 const PROJECT_TYPES = [
@@ -28,12 +28,12 @@ const PROJECT_TYPES = [
     { id: 'turf', name: 'Turf', icon: 'turf.png' },
 ];
 
-const WEEKLY_GOAL = 60; // Renamed from MONTHLY_GOAL
+const WEEKLY_GOAL = 60; 
 
 const PROJECTS_COLLECTION = 'projects';
-const WEEKLY_RECORDS_COLLECTION = 'weeklyRecords'; // New collection for weekly logs
+const WEEKLY_RECORDS_COLLECTION = 'weeklyRecords'; 
 
-const LOCATIONS = {
+const LOCATIONS = { // This is the global constant
     REGINA: { id: 'regina', name: 'Regina', abbreviation: 'RGNA', tileColor: 'bg-blue-100/80 border-blue-400', bucketColor: 'border-blue-400 bg-blue-50 hover:bg-blue-100', textColor: 'text-blue-700', bucketOverColor: 'border-blue-600 bg-blue-100 scale-105' },
     SASKATOON: { id: 'saskatoon', name: 'Saskatoon', abbreviation: 'SKTN', tileColor: 'bg-green-100/80 border-green-400', bucketColor: 'border-green-400 bg-green-50 hover:bg-green-100', textColor: 'text-green-700', bucketOverColor: 'border-green-600 bg-green-100 scale-105' }
 };
@@ -47,33 +47,29 @@ const formatDate = (date, options = { month: 'short', day: 'numeric' }) => {
     return new Date(date).toLocaleDateString(undefined, options);
 };
 
-// Gets the Sunday of the week the given date falls into.
 const getWeekEndDate = (dateForWeek) => {
     const date = new Date(dateForWeek);
-    const day = date.getDay(); // 0 (Sunday) to 6 (Saturday)
-    const diff = date.getDate() - day + (day === 0 ? 0 : 7); // Adjust to Sunday
+    const day = date.getDay(); 
+    const diff = date.getDate() - day + (day === 0 ? 0 : 7); 
     return new Date(date.setDate(diff));
 };
 
-// Gets the Monday of the week the given Sunday falls into.
 const getWeekStartDate = (sundayEndDate) => {
     const startDate = new Date(sundayEndDate);
     startDate.setDate(sundayEndDate.getDate() - 6);
     return startDate;
 };
 
-
 // --- Context for Application State ---
 const AppContext = createContext();
 
 const AppProvider = ({ children }) => {
     const [loggedProjects, setLoggedProjects] = useState([]);
-    const [weeklyRecords, setWeeklyRecords] = useState([]); // State for weekly logs
+    const [weeklyRecords, setWeeklyRecords] = useState([]); 
     const [currentPage, setCurrentPage] = useState('input');
     const [isLoading, setIsLoading] = useState(true);
-    const [isProcessingWeek, setIsProcessingWeek] = useState(false); // For loading state of log/reset
+    const [isProcessingWeek, setIsProcessingWeek] = useState(false); 
 
-    // Effect to set initial page based on hash or localStorage
     useEffect(() => {
         const getInitialPage = () => {
             const hash = window.location.hash;
@@ -85,7 +81,6 @@ const AppProvider = ({ children }) => {
         setCurrentPage(getInitialPage());
     }, []);
 
-    // Effect to subscribe to Firebase project and weekly record updates
     useEffect(() => {
         setIsLoading(true);
         const projectsQuery = query(collection(db, PROJECTS_COLLECTION), orderBy('timestamp', 'desc'));
@@ -94,7 +89,6 @@ const AppProvider = ({ children }) => {
         const unsubscribeProjects = onSnapshot(projectsQuery, (querySnapshot) => {
             const projectsData = querySnapshot.docs.map(pDoc => ({ ...pDoc.data(), id: pDoc.id }));
             setLoggedProjects(projectsData);
-            // Check for auto-reset after projects are loaded
             handleAutoSundayReset(projectsData); 
         }, (error) => {
             console.error("Error fetching projects: ", error);
@@ -109,19 +103,17 @@ const AppProvider = ({ children }) => {
             alert("Could not fetch weekly records.");
         });
         
-        // Combined loading state management
         Promise.all([
-            getDocs(projectsQuery), // Initial fetch to help determine loading
+            getDocs(projectsQuery), 
             getDocs(recordsQuery)
         ]).finally(() => setIsLoading(false));
-
 
         return () => {
             unsubscribeProjects();
             unsubscribeRecords();
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // handleAutoSundayReset dependency will be managed internally or via useCallback if needed
+    }, []); 
 
     const handleSetCurrentPage = (page) => {
         setCurrentPage(page);
@@ -130,12 +122,11 @@ const AppProvider = ({ children }) => {
     };
 
     const addProjectToFirebase = async (salespersonId, projectTypeId, locationId) => {
-        // ... (same as before)
         const salesperson = SALESPERSONS.find(s => s.id === salespersonId);
         const projectType = PROJECT_TYPES.find(p => p.id === projectTypeId);
-        const location = LOCATIONS[locationId.toUpperCase()];
+        const locationDetails = LOCATIONS[locationId.toUpperCase()]; // Use LOCATIONS constant
 
-        if (!salesperson || !projectType || !location) {
+        if (!salesperson || !projectType || !locationDetails) {
             alert("Error: Invalid salesperson, project type, or location selected.");
             return false;
         }
@@ -147,7 +138,7 @@ const AppProvider = ({ children }) => {
                 projectTypeId,
                 projectIcon: projectType.icon,
                 projectName: projectType.name,
-                location: location.id,
+                location: locationDetails.id, // Store location ID
                 timestamp: serverTimestamp(),
             });
             return true;
@@ -159,10 +150,8 @@ const AppProvider = ({ children }) => {
     };
 
     const deleteAllProjectsFromBoard = async () => {
-        // Deletes all projects from the PROJECTS_COLLECTION
         const projectsQuerySnapshot = await getDocs(collection(db, PROJECTS_COLLECTION));
         if (projectsQuerySnapshot.empty) return;
-
         const batch = writeBatch(db);
         projectsQuerySnapshot.docs.forEach(pDoc => {
             batch.delete(doc(db, PROJECTS_COLLECTION, pDoc.id));
@@ -177,24 +166,21 @@ const AppProvider = ({ children }) => {
         setIsProcessingWeek(true);
         try {
             const today = new Date();
-            const weekEnd = getWeekEndDate(today); // Sunday of the current week (or week just ended if it's Sunday)
+            const weekEnd = getWeekEndDate(today); 
             const weekStart = getWeekStartDate(weekEnd);
-            
             const weekDisplay = `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
-            const completed = loggedProjects.length; // All current projects are counted
+            const completed = loggedProjects.length; 
 
             const newRecord = {
                 weekDisplay,
                 completed,
                 target: WEEKLY_GOAL,
-                weekEndDate: weekEnd.toISOString(), // Store as ISO string for easier querying/sorting
+                weekEndDate: weekEnd.toISOString(), 
                 loggedAt: serverTimestamp()
             };
 
             await addDoc(collection(db, WEEKLY_RECORDS_COLLECTION), newRecord);
             await deleteAllProjectsFromBoard();
-            // No need to call setLoggedProjects([]) as onSnapshot will update it.
-            // Fetching weeklyRecords is also handled by its onSnapshot.
 
             if (!isAuto) alert("Current projects logged for the week and display board has been reset.");
             else console.log("Weekly projects automatically logged and board reset.");
@@ -209,18 +195,16 @@ const AppProvider = ({ children }) => {
 
     const handleAutoSundayReset = async (currentProjects) => {
         const today = new Date();
-        if (today.getDay() === 0) { // It's Sunday
-            const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD
+        if (today.getDay() === 0) { 
+            const todayISO = today.toISOString().split('T')[0]; 
             const lastAutoResetSunday = localStorage.getItem('lastAutoResetSunday');
 
             if (lastAutoResetSunday !== todayISO) {
-                // Only proceed if there are projects to log for the week ending today
                 if (currentProjects && currentProjects.length > 0) { 
                     console.log("Attempting automatic Sunday log and reset...");
-                    await logWeekAndResetBoard(true); // Pass true for automatic, no confirm
+                    await logWeekAndResetBoard(true); 
                     localStorage.setItem('lastAutoResetSunday', todayISO);
                 } else {
-                    // If no projects, still mark Sunday as processed to avoid re-check if app is opened multiple times
                     localStorage.setItem('lastAutoResetSunday', todayISO);
                     console.log("Automatic Sunday check: No projects to log, board is already clear or was cleared. Marked Sunday as processed.");
                 }
@@ -228,14 +212,20 @@ const AppProvider = ({ children }) => {
         }
     };
 
-
     return (
         <AppContext.Provider value={{ 
-            loggedProjects, weeklyRecords, addProject: addProjectToFirebase, currentPage, 
-            setCurrentPage: handleSetCurrentPage, weeklyGoal: WEEKLY_GOAL, 
-            salespersons: SALESPERSONS, projectTypes: PROJECT_TYPES, 
-            logWeekAndResetBoard, // Expose the new function
-            isLoading, isProcessingWeek, locations
+            loggedProjects, 
+            weeklyRecords, 
+            addProject: addProjectToFirebase, 
+            currentPage, 
+            setCurrentPage: handleSetCurrentPage, 
+            weeklyGoal: WEEKLY_GOAL, 
+            salespersons: SALESPERSONS, 
+            projectTypes: PROJECT_TYPES, 
+            logWeekAndResetBoard, 
+            isLoading, 
+            isProcessingWeek, 
+            locationsData: LOCATIONS // CHANGED: Provide LOCATIONS under a different key
         }}>
             {children}
         </AppContext.Provider>
@@ -243,7 +233,6 @@ const AppProvider = ({ children }) => {
 };
 
 // --- UI Components ---
-// Card, Button, LoadingSpinner (same as before)
 const Card = ({ children, className = '' }) => (
     <div className={`bg-white shadow-xl rounded-lg p-6 md:p-8 ${className}`}>
         {children}
@@ -274,7 +263,6 @@ const LoadingSpinner = ({ message = "Loading..."}) => (
     </div>
 );
 
-// Confetti (same as before)
 const createConfettiPiece = () => {
     const piece = document.createElement('div');
     piece.style.position = 'fixed';
@@ -295,7 +283,6 @@ const animateConfettiPiece = (piece) => {
     const fallDuration = Math.random() * 3 + 2.5; 
     const swayAmount = Math.random() * 200 - 100; 
     const rotation = Math.random() * 720 + 360; 
-
     piece.animate([
         { transform: `translate3d(0, 0, 0) rotate(${piece.style.transform.match(/\d+/)[0]}deg)`, opacity: 1 },
         { transform: `translate3d(${swayAmount}px, 110vh, 0) rotate(${rotation}deg)`, opacity: 0 }
@@ -312,15 +299,13 @@ const triggerConfetti = (count = 150) => {
     }
 };
 
-// --- Input Page Components ---
-// ProjectIcon, LocationBucket (same as before with larger icons in ProjectIcon)
 const ProjectIcon = ({ project, onDragStart }) => (
     <div draggable onDragStart={(e) => onDragStart(e, project.id)}
         className="flex flex-col items-center justify-center p-1 sm:p-2 m-1 border-2 border-dashed border-gray-300 rounded-lg cursor-grab hover:bg-gray-100 transition-colors aspect-square"
         title={project.name}>
         {isIconUrl(project.icon) ? (
             <img 
-                src={project.icon} // Assuming icons are in public folder
+                src={project.icon} 
                 alt={project.name} 
                 className="w-20 h-20 sm:w-24 sm:h-24 object-contain pointer-events-none"
                 onError={(e) => { e.target.src='https://placehold.co/64x64/cccccc/969696?text=IMG'; e.target.alt = 'Image not found'; }}
@@ -344,19 +329,18 @@ const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOv
     </div>
 );
 
-// New Component for Weekly Log Display
 const WeeklyLogDisplay = () => {
-    const { weeklyRecords, isLoading, weeklyGoal } = useContext(AppContext);
+    const { weeklyRecords, isLoading } = useContext(AppContext); // Removed weeklyGoal as it's in each record
 
-    if (isLoading && weeklyRecords.length === 0) { // Show loading only if records are empty initially
+    if (isLoading && weeklyRecords.length === 0) { 
         return <LoadingSpinner message="Loading weekly records..." />;
     }
 
     return (
-        <Card className="bg-gray-50 h-full"> {/* Added h-full for consistent height with leaderboard */}
+        <Card className="bg-gray-50 h-full"> 
             <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Weekly Performance</h2>
             {weeklyRecords.length > 0 ? (
-                <ul className="space-y-2 max-h-96 overflow-y-auto pr-2"> {/* Added max-height and scroll */}
+                <ul className="space-y-2 max-h-96 overflow-y-auto pr-2"> 
                     {weeklyRecords.map(record => (
                         <li key={record.id} className={`p-3 rounded-lg shadow text-gray-700 ${record.completed >= record.target ? 'bg-green-100 border-green-400' : 'bg-red-100 border-red-400'}`}>
                             <div className="flex justify-between items-center">
@@ -378,12 +362,19 @@ const WeeklyLogDisplay = () => {
     );
 };
 
-
 const InputPage = () => {
-    const { addProject, salespersons, projectTypes, setCurrentPage, isLoading, isProcessingWeek, locations, loggedProjects, logWeekAndResetBoard } = useContext(AppContext);
+    // CHANGED: Destructure locationsData and alias to locations
+    const { 
+        addProject, salespersons, projectTypes, setCurrentPage, isLoading, 
+        isProcessingWeek, locationsData: locations, loggedProjects, logWeekAndResetBoard 
+    } = useContext(AppContext) || {}; // Added fallback to empty object for safety
+
     const [selectedSalesperson, setSelectedSalesperson] = useState(''); 
     const [draggingOverBucket, setDraggingOverBucket] = useState(null);
     const [congratsData, setCongratsData] = useState({ show: false, name: '', project: '', location: '' });
+
+    // Ensure locations is available before using it
+    const safeLocations = locations || {};
 
     const handleDragStart = (e, projectId) => e.dataTransfer.setData('projectId', projectId);
 
@@ -400,7 +391,7 @@ const InputPage = () => {
                     show: true,
                     name: SPerson ? SPerson.name : 'Valued Team Member',
                     project: SProject ? SProject.name : 'a project',
-                    location: locations[locationId.toUpperCase()].name
+                    location: safeLocations[locationId.toUpperCase()]?.name || locationId // Use safeLocations
                 });
                 triggerConfetti(150);
                 setTimeout(() => setCongratsData({ show: false, name: '', project: '', location: '' }), 3000);
@@ -419,9 +410,13 @@ const InputPage = () => {
         projectCount: loggedProjects.filter(p => p.salespersonId === sp.id).length
     })).sort((a, b) => b.projectCount - a.projectCount);
 
+    if (!locations) { // Early return or loading state if locations context is not yet available
+        return <LoadingSpinner message="Initializing app data..." />;
+    }
+
     return (
-        <div className="container mx-auto p-4 md:p-6 max-w-7xl"> {/* Increased max-width for new layout */}
-            {congratsData.show && (
+        <div className="container mx-auto p-4 md:p-6 max-w-7xl"> 
+            {congratsData.show && ( /* ... congrats popup ... */
                 <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10000] p-4">
                     <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl text-center max-w-md w-full">
                         <span role="img" aria-label="gift" className="text-6xl sm:text-7xl mb-4 inline-block animate-bounce">🎉</span> 
@@ -431,16 +426,13 @@ const InputPage = () => {
                     </div>
                 </div>
             )}
-
-            {/* Main content area: Project Logging and Leaderboards/WeeklyLog */}
             <div className="grid lg:grid-cols-2 gap-6 lg:gap-8">
-                {/* Column 1: Project Logging */}
-                <Card>
+                <Card> {/* ... project logging card ... */}
                     <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
                         <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Log New Project</h1>
                         <Button onClick={() => setCurrentPage('display')} variant="secondary" disabled={isLoading || isProcessingWeek}>View Display Board</Button>
                     </div>
-                    {isLoading && <LoadingSpinner message="Connecting to Database..." />}
+                    {isLoading && !isProcessingWeek && <LoadingSpinner message="Connecting to Database..." />}
                     <div className="mb-6">
                         <label htmlFor="salesperson" className="block text-lg font-medium text-gray-700 mb-2">Salesperson:</label>
                         <select id="salesperson" value={selectedSalesperson} onChange={(e) => setSelectedSalesperson(e.target.value)}
@@ -456,17 +448,15 @@ const InputPage = () => {
                         </div>
                     </div>
                     <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-                        <LocationBucket locationDetails={locations.REGINA} onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, locations.REGINA.id)} onDragLeave={handleDragLeave} isOver={draggingOverBucket === locations.REGINA.id} projectCount={getProjectCountForLocation(locations.REGINA.id)} />
-                        <LocationBucket locationDetails={locations.SASKATOON} onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, locations.SASKATOON.id)} onDragLeave={handleDragLeave} isOver={draggingOverBucket === locations.SASKATOON.id} projectCount={getProjectCountForLocation(locations.SASKATOON.id)} />
+                        <LocationBucket locationDetails={safeLocations.REGINA} onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, safeLocations.REGINA.id)} onDragLeave={handleDragLeave} isOver={draggingOverBucket === safeLocations.REGINA.id} projectCount={getProjectCountForLocation(safeLocations.REGINA.id)} />
+                        <LocationBucket locationDetails={safeLocations.SASKATOON} onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, safeLocations.SASKATOON.id)} onDragLeave={handleDragLeave} isOver={draggingOverBucket === safeLocations.SASKATOON.id} projectCount={getProjectCountForLocation(safeLocations.SASKATOON.id)} />
                     </div>
                 </Card>
-
-                {/* Column 2: Leaderboard and Weekly Log */}
-                <div className="space-y-6 lg:space-y-8">
+                <div className="space-y-6 lg:space-y-8"> {/* ... leaderboard and weekly log ... */}
                     <Card className="bg-gray-50">
                         <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Salesperson Leaderboard</h2>
                         {isLoading && salespersonStats.length === 0 ? <LoadingSpinner message="Loading leaderboard..." /> : salespersonStats.length > 0 ? (
-                            <ul className="space-y-2 max-h-96 overflow-y-auto pr-2"> {/* Added max-height and scroll */}
+                            <ul className="space-y-2 max-h-96 overflow-y-auto pr-2"> 
                                 {salespersonStats.map((sp, index) => (
                                     <li key={sp.id} className={`p-3 rounded-lg shadow flex justify-between items-center text-gray-700 ${index === 0 ? 'bg-yellow-100 border-yellow-400' : index === 1 ? 'bg-gray-200 border-gray-400' : index === 2 ? 'bg-orange-100 border-orange-400' : 'bg-white border-gray-300'}`}>
                                         <span className="font-medium text-lg">{index + 1}. {sp.name} {index === 0 && '🥇'} {index === 1 && '🥈'} {index === 2 && '🥉'}</span>
@@ -479,7 +469,6 @@ const InputPage = () => {
                     <WeeklyLogDisplay />
                 </div>
             </div>
-             {/* Admin action button at the bottom or in a separate admin section if preferred */}
              <div className="mt-8 text-center">
                 <Button onClick={() => logWeekAndResetBoard(false)} variant="danger" disabled={isLoading || isProcessingWeek}>
                     {isProcessingWeek ? 'Processing...' : 'Finalize Week & Reset Board'}
@@ -489,14 +478,13 @@ const InputPage = () => {
     );
 };
 
-
-// --- Display Page Components ---
-// ProjectGridCell, DisplayPage (mostly same as before, ensure numColumns is 6 for DisplayPage)
 const ProjectGridCell = ({ project, locationMap }) => {
-    const locationDetails = Object.values(locationMap).find(loc => loc.id === project.location);
+    // Ensure locationMap is an object before trying to use Object.values or find
+    const safeLocationMap = locationMap || {};
+    const locationDetails = Object.values(safeLocationMap).find(loc => loc.id === project.location);
     const tileBgColor = locationDetails ? locationDetails.tileColor : 'bg-gray-100/80 border-gray-400';
 
-    return (
+    return ( /* ... ProjectGridCell JSX ... */
         <div className={`aspect-square shadow-lg rounded-lg flex flex-col items-center justify-center p-1.5 sm:p-2 text-center border ${tileBgColor} hover:shadow-xl transition-shadow`}>
             <div className="w-[80%] h-[80%] flex items-center justify-center">
                 {isIconUrl(project.projectIcon) ? (
@@ -516,7 +504,12 @@ const ProjectGridCell = ({ project, locationMap }) => {
 };
 
 const DisplayPage = () => {
-    const { loggedProjects, weeklyGoal, setCurrentPage, isLoading, isProcessingWeek, locations, logWeekAndResetBoard } = useContext(AppContext); // Added logWeekAndResetBoard for admin footer
+    // CHANGED: Destructure locationsData and alias to locations
+    const { 
+        loggedProjects, weeklyGoal, setCurrentPage, isLoading, 
+        isProcessingWeek, locationsData: locations 
+    } = useContext(AppContext) || {}; // Added fallback to empty object for safety
+
     const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
@@ -524,17 +517,20 @@ const DisplayPage = () => {
         return () => clearInterval(timer);
     }, []);
 
+    // Ensure locations is available before using it for locationMap
+    const safeLocations = locations || {};
+
     const projectsToDisplay = loggedProjects.slice(0, weeklyGoal); 
     const emptyCellsCount = Math.max(0, weeklyGoal - projectsToDisplay.length);
-    const numColumns = 10; // For 60 items, 10 columns = 6 rows. Or 12 columns = 5 rows. Adjust as needed.
-                           // Or make it dynamic: Math.ceil(Math.sqrt(weeklyGoal * (aspect_ratio_width/aspect_ratio_height)))
-                           // For approx square cells with 60 items, sqrt(60) is ~7.7. So 8 columns might be good (8x8=64).
-                           // Let's try 10 columns for 60 items to get 6 rows.
-                           // const numColumns = Math.ceil(weeklyGoal / 6); // If you want exactly 6 rows
+    const numColumns = 10; 
 
-    return (
+    if (!locations) { // Early return or loading state if locations context is not yet available
+        return <LoadingSpinner message="Initializing display data..." />;
+    }
+
+    return ( /* ... DisplayPage JSX ... */
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-2 sm:p-4 md:p-6 flex flex-col items-center justify-center">
-            <div className="w-full max-w-[2560px] h-full flex flex-col"> {/* Max width for very large displays */}
+            <div className="w-full max-w-[2560px] h-full flex flex-col">
                 <header className="w-full mb-2 md:mb-4 text-center py-1 sm:py-2">
                     <div className="flex justify-between items-center mb-2 sm:mb-3 px-2">
                         <img src="TUDS Logo Colour.png" alt="TUDS Logo" 
@@ -559,13 +555,12 @@ const DisplayPage = () => {
                         <p className="mt-1 text-xl sm:text-2xl text-green-400 animate-pulse">🎉 Goal Achieved! 🎉</p>
                     )}
                 </header>
-
                 <main className="w-full flex-grow flex items-center justify-center px-1 sm:px-2">
                     {(isLoading && loggedProjects.length === 0) && <LoadingSpinner message="Loading Projects..." />}
                     {!isLoading && (
                         <div className={`grid gap-1 sm:gap-1.5 md:gap-2 w-full`} style={{gridTemplateColumns: `repeat(${numColumns}, minmax(0, 1fr))`}}>
                             {projectsToDisplay.map(proj => (
-                                <ProjectGridCell key={proj.id} project={proj} locationMap={locations} />
+                                <ProjectGridCell key={proj.id} project={proj} locationMap={safeLocations} /> // Use safeLocations
                             ))}
                             {Array.from({ length: emptyCellsCount }).map((_, idx) => (
                                 <div key={`empty_${idx}`} className="aspect-square bg-slate-800/70 rounded-lg opacity-60"></div>
@@ -578,34 +573,40 @@ const DisplayPage = () => {
                         </div>
                     )}
                 </main>
-                
                 <footer className="w-full mt-2 md:mt-4 text-center py-1 sm:py-2">
                     <Button onClick={() => setCurrentPage('input')} variant="secondary" className="mr-2 sm:mr-4 text-xs sm:text-sm" disabled={isLoading || isProcessingWeek}>
                         Input Page
                     </Button>
-                    {/* The admin reset button is now primarily on the InputPage for better context */}
                 </footer>
             </div>
         </div>
     );
 };
 
-// --- Main Application Component ---
 function App() {
-    const { currentPage, setCurrentPage: contextSetCurrentPage } = useContext(AppContext);
+    const appContextValue = useContext(AppContext); // Get the whole context value
+
+    // If context is not yet available (e.g., AppProvider hasn't fully initialized its value)
+    // you might want to show a global loading spinner or null.
+    // This check is important if App component itself needs context before its children.
+    if (!appContextValue) {
+        return <LoadingSpinner message="Initializing Application..." />; 
+    }
+    const { currentPage } = appContextValue; // Now destructure safely
 
     useEffect(() => {
         const handleHashChange = () => {
             const hash = window.location.hash;
-            if (contextSetCurrentPage) {
-                if (hash === '#/display') contextSetCurrentPage('display');
-                else if (hash === '#/input' || hash === '') contextSetCurrentPage('input');
+            // Ensure contextSetCurrentPage (from appContextValue.setCurrentPage) is available
+            if (appContextValue && appContextValue.setCurrentPage) {
+                if (hash === '#/display') appContextValue.setCurrentPage('display');
+                else if (hash === '#/input' || hash === '') appContextValue.setCurrentPage('input');
             }
         };
         window.addEventListener('hashchange', handleHashChange, false);
         handleHashChange();
         return () => window.removeEventListener('hashchange', handleHashChange, false);
-    }, [contextSetCurrentPage]);
+    }, [appContextValue]); // Depend on the whole context value or specific parts if stable
 
     return (
         <div className="min-h-screen bg-gray-100 font-sans">
