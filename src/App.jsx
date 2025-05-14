@@ -16,6 +16,7 @@ const SALESPERSONS = [
     { id: 'shane', name: 'Shane', initials: 'SH' },
     { id: 'steve', name: 'Steve', initials: 'ST' },
     { id: 'wade', name: 'Wade', initials: 'WA' },
+    { id: 'sam', name: 'Sam', initials: 'SA' },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 const PROJECT_TYPES = [
