@@ -1,0 +1,30 @@
+{
+  "name": "sales-tracker-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "firebase": "^10.7.0", /* Updated to a more recent stable version */
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.37", /* Consider updating if newer stable versions exist */
+    "@types/react-dom": "^18.2.15", /* Consider updating */
+    "@vitejs/plugin-react": "^4.2.1", /* Updated to a more recent stable version */
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.55.0", /* Consider updating */
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5", /* Updated */
+    "postcss": "^8.4.32", /* Updated */
+    "tailwindcss": "^3.3.6", /* Updated */
+    "vite": "^5.0.10" /* Updated to a more recent stable version */
+  }
+}
