@@ -330,17 +330,17 @@ const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOv
 );
 
 const WeeklyLogDisplay = () => {
-    const { weeklyRecords, isLoading } = useContext(AppContext); 
+    const { weeklyRecords, isLoading, logWeekAndResetBoard, isProcessingWeek } = useContext(AppContext); 
 
     if (isLoading && weeklyRecords.length === 0) { 
         return <LoadingSpinner message="Loading weekly records..." />;
     }
 
     return (
-        <Card className="bg-gray-50 h-full"> 
+        <Card className="bg-gray-50 h-full flex flex-col"> {/* Added flex flex-col for button placement */}
             <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Weekly Performance</h2>
             {weeklyRecords.length > 0 ? (
-                <ul className="space-y-2 max-h-96 overflow-y-auto pr-2"> 
+                <ul className="space-y-2 max-h-80 overflow-y-auto pr-2 flex-grow"> {/* flex-grow to take available space */}
                     {weeklyRecords.map(record => (
                         <li key={record.id} className={`p-3 rounded-lg shadow text-gray-700 ${record.completed >= record.target ? 'bg-green-100 border-green-400' : 'bg-red-100 border-red-400'}`}>
                             <div className="flex justify-between items-center">
@@ -356,8 +356,13 @@ const WeeklyLogDisplay = () => {
                     ))}
                 </ul>
             ) : (
-                <p className="text-gray-600 text-center py-4">No weekly records yet.</p>
+                <p className="text-gray-600 text-center py-4 flex-grow flex items-center justify-center">No weekly records yet.</p> // flex-grow to center if no records
             )}
+            <div className="mt-auto pt-4 text-center"> {/* mt-auto pushes button to bottom */}
+                 <Button onClick={() => logWeekAndResetBoard(false)} variant="danger" className="w-full sm:w-auto" disabled={isLoading || isProcessingWeek}>
+                    {isProcessingWeek ? 'Processing...' : 'Finalize Week & Reset Board'}
+                </Button>
+            </div>
         </Card>
     );
 };
@@ -365,7 +370,7 @@ const WeeklyLogDisplay = () => {
 const InputPage = () => {
     const { 
         addProject, salespersons, projectTypes, setCurrentPage, isLoading, 
-        isProcessingWeek, locationsData: locations, loggedProjects, logWeekAndResetBoard 
+        isProcessingWeek, locationsData: locations, loggedProjects
     } = useContext(AppContext) || {}; 
 
     const [selectedSalesperson, setSelectedSalesperson] = useState(''); 
@@ -413,7 +418,7 @@ const InputPage = () => {
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-6 max-w-screen-2xl"> {/* Increased max-width for better layout */}
+        <div className="container mx-auto p-4 md:p-6 max-w-screen-xl"> {/* Adjusted max-width */}
             {congratsData.show && ( 
                 <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10000] p-4">
                     <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl text-center max-w-md w-full">
@@ -424,43 +429,46 @@ const InputPage = () => {
                     </div>
                 </div>
             )}
-            {/* Main layout grid: 75% for logging, 25% for leaderboard on large screens */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8 mb-8">
-                {/* Column 1: Project Logging Card (spans 3 out of 4 columns on lg screens) */}
-                <div className="lg:col-span-3">
-                    <Card> 
-                        <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-                            <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Log New Project</h1>
-                            <Button onClick={() => setCurrentPage('display')} variant="secondary" disabled={isLoading || isProcessingWeek}>View Display Board</Button>
+            
+            {/* Top Row: Log New Project Card */}
+            <div className="mb-6 lg:mb-8">
+                <Card> 
+                    <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                        <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Log New Project</h1>
+                        <Button onClick={() => setCurrentPage('display')} variant="secondary" disabled={isLoading || isProcessingWeek}>View Display Board</Button>
+                    </div>
+                    {isLoading && !isProcessingWeek && <LoadingSpinner message="Connecting to Database..." />}
+                    <div className="mb-6">
+                        <label htmlFor="salesperson" className="block text-lg font-medium text-gray-700 mb-2">Salesperson:</label>
+                        <select id="salesperson" value={selectedSalesperson} onChange={(e) => setSelectedSalesperson(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 text-lg" disabled={isLoading || isProcessingWeek} required>
+                            <option value="" disabled>Select Salesperson</option>
+                            {salespersons.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="mb-6">
+                        <h2 className="text-xl font-semibold text-gray-700 mb-3">Available Projects (Drag to Location):</h2>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                            {projectTypes.map(pt => <ProjectIcon key={pt.id} project={pt} onDragStart={handleDragStart} />)}
                         </div>
-                        {isLoading && !isProcessingWeek && <LoadingSpinner message="Connecting to Database..." />}
-                        <div className="mb-6">
-                            <label htmlFor="salesperson" className="block text-lg font-medium text-gray-700 mb-2">Salesperson:</label>
-                            <select id="salesperson" value={selectedSalesperson} onChange={(e) => setSelectedSalesperson(e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 text-lg" disabled={isLoading || isProcessingWeek} required>
-                                <option value="" disabled>Select Salesperson</option>
-                                {salespersons.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="mb-6">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-3">Available Projects (Drag to Location):</h2>
-                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
-                                {projectTypes.map(pt => <ProjectIcon key={pt.id} project={pt} onDragStart={handleDragStart} />)}
-                            </div>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-                            <LocationBucket locationDetails={safeLocations.REGINA} onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, safeLocations.REGINA.id)} onDragLeave={handleDragLeave} isOver={draggingOverBucket === safeLocations.REGINA.id} projectCount={getProjectCountForLocation(safeLocations.REGINA.id)} />
-                            <LocationBucket locationDetails={safeLocations.SASKATOON} onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, safeLocations.SASKATOON.id)} onDragLeave={handleDragLeave} isOver={draggingOverBucket === safeLocations.SASKATOON.id} projectCount={getProjectCountForLocation(safeLocations.SASKATOON.id)} />
-                        </div>
-                    </Card>
-                </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+                        <LocationBucket locationDetails={safeLocations.REGINA} onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, safeLocations.REGINA.id)} onDragLeave={handleDragLeave} isOver={draggingOverBucket === safeLocations.REGINA.id} projectCount={getProjectCountForLocation(safeLocations.REGINA.id)} />
+                        <LocationBucket locationDetails={safeLocations.SASKATOON} onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, safeLocations.SASKATOON.id)} onDragLeave={handleDragLeave} isOver={draggingOverBucket === safeLocations.SASKATOON.id} projectCount={getProjectCountForLocation(safeLocations.SASKATOON.id)} />
+                    </div>
+                </Card>
+            </div>
 
-                {/* Column 2: Salesperson Leaderboard (spans 1 out of 4 columns on lg screens) */}
-                <div className="lg:col-span-1">
-                    <Card className="bg-gray-50 h-full"> {/* Added h-full to try and match height */}
+            {/* Second Row: Weekly Log and Leaderboard */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+                <div> {/* Column for Weekly Log & Reset Button */}
+                    <WeeklyLogDisplay />
+                </div>
+                <div> {/* Column for Leaderboard */}
+                    <Card className="bg-gray-50 h-full"> 
                         <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Salesperson Leaderboard</h2>
                         {isLoading && salespersonStats.length === 0 ? <LoadingSpinner message="Loading leaderboard..." /> : salespersonStats.length > 0 ? (
-                            <ul className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-2"> {/* Adjust max-h as needed */}
+                            <ul className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2"> {/* Adjust max-h if needed */}
                                 {salespersonStats.map((sp, index) => (
                                     <li key={sp.id} className={`p-3 rounded-lg shadow flex justify-between items-center text-gray-700 ${index === 0 ? 'bg-yellow-100 border-yellow-400' : index === 1 ? 'bg-gray-200 border-gray-400' : index === 2 ? 'bg-orange-100 border-orange-400' : 'bg-white border-gray-300'}`}>
                                         <span className="font-medium text-lg">{index + 1}. {sp.name} {index === 0 && '🥇'} {index === 1 && '🥈'} {index === 2 && '🥉'}</span>
@@ -470,20 +478,6 @@ const InputPage = () => {
                             </ul>
                         ) : ( <p className="text-gray-600 text-center py-4">No projects logged yet.</p> )}
                     </Card>
-                </div>
-            </div>
-            
-            {/* Section below the main grid for Weekly Log and Admin Button */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-                 {/* Weekly Log takes up more space on medium screens */}
-                <div className="md:col-span-2">
-                    <WeeklyLogDisplay />
-                </div>
-                {/* Admin Button in its own column or centered below */}
-                <div className="flex items-center justify-center md:col-span-1">
-                     <Button onClick={() => logWeekAndResetBoard(false)} variant="danger" className="w-full md:w-auto" disabled={isLoading || isProcessingWeek}>
-                        {isProcessingWeek ? 'Processing...' : 'Finalize Week & Reset Board'}
-                    </Button>
                 </div>
             </div>
         </div>
@@ -531,8 +525,7 @@ const DisplayPage = () => {
     const projectsToDisplay = loggedProjects.slice(0, weeklyGoal); 
     const emptyCellsCount = Math.max(0, weeklyGoal - projectsToDisplay.length);
     
-    // CORRECTED: Set numColumns to 6 for DisplayPage
-    const numColumns = 6; 
+    const numColumns = 6; // DisplayPage uses 6 columns
 
     if (!locations) { 
         return <LoadingSpinner message="Initializing display data..." />;
