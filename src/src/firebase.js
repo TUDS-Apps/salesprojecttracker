@@ -2,16 +2,15 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// VVVVVV  PASTE YOUR firebaseConfig FROM FIREBASE HERE  VVVVVV
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY", // Replace with your actual apiKey
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com", // Replace
-  projectId: "YOUR_PROJECT_ID", // Replace
-  storageBucket: "YOUR_PROJECT_ID.appspot.com", // Replace
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace
-  appId: "YOUR_APP_ID" // Replace
+  apiKey: "AIzaSyAic56lPgHqnMSJAgslpTAsNqqwY19UHiQ",
+  authDomain: "sales-project-tracker.firebaseapp.com",
+  projectId: "sales-project-tracker",
+  storageBucket: "sales-project-tracker.firebasestorage.app",
+  messagingSenderId: "275799582428",
+  appId: "1:275799582428:web:a44d210b2d48765d537619",
+  measurementId: "G-6ZQ7SL2DX9"
 };
-// ^^^^^^ MAKE SURE YOU PASTED YOUR ACTUAL CONFIG ABOVE ^^^^^^
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
