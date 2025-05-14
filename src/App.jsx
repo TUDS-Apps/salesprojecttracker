@@ -21,13 +21,12 @@ const SALESPERSONS = [
 const PROJECT_TYPES = [
     // Replace these example icon URLs with your actual icon URLs or emojis
     // If using local images in the 'public' folder, the path would be like '/icons/railing.png'
-    { id: 'railing', name: 'Railing', icon: 'https://placehold.co/64x64/transparent/333333?text=⛓️&font=roboto' }, // Example URL
-    { id: 'deck', name: 'Deck', icon: 'https://placehold.co/64x64/transparent/333333?text=🪵&font=roboto' },       // Example URL
-    { id: 'patio', name: 'Patio', icon: 'https://placehold.co/64x64/transparent/333333?text=🪨&font=roboto' },       // Example URL
-    { id: 'fence', name: 'Fence', icon: 'https://placehold.co/64x64/transparent/333333?text=🧱&font=roboto' },       // Example URL
-    { id: 'pergola', name: 'Pergola', icon: 'https://placehold.co/64x64/transparent/333333?text=🌿&font=roboto' },   // Example URL
-    { id: 'turf', name: 'Turf', icon: 'https://placehold.co/64x64/transparent/333333?text=🌱&font=roboto' },         // Example URL
-    // { id: 'backyard', name: 'Whole Backyard', icon: 'https://placehold.co/64x64/transparent/333333?text=🏡&font=roboto' } // Removed "Whole Backyard"
+    { id: 'railing', name: 'Railing', icon: '/public/railing.png' }, // Example URL
+    { id: 'deck', name: 'Deck', icon: '/public/deck.png' },       // Example URL
+    { id: 'hardscapes', name: 'Hardscapes', icon: '/public/hardscapes.png' },       // Example URL
+    { id: 'fence', name: 'Fence', icon: '/public/fence.png' },       // Example URL
+    { id: 'pergola', name: 'Pergola', icon: '/public/pergola.png' },   // Example URL
+    { id: 'turf', name: 'Turf', icon: '/public/turf.png' },         // Example URL
 ];
 
 // --- Monthly Goal - Manually change this value when the target changes ---
