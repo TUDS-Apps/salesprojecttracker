@@ -454,7 +454,7 @@ const DisplayPage = () => {
     
     // Dynamically calculate number of columns for the grid
     // Aims for squarish cells, typically 5 columns for 30 items (6 rows)
-    const numColumns = Math.min(5, Math.max(3, Math.ceil(Math.sqrt(monthlyGoal * 0.7))));
+    const numColumns = Math.min(6, Math.max(3, Math.ceil(Math.sqrt(monthlyGoal * 0.7))));
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-2 sm:p-4 md:p-6 flex flex-col items-center justify-center">
