@@ -22,7 +22,7 @@ const PROJECT_TYPES = [
     // Replace these example icon URLs with your actual icon URLs or emojis
     // If using local images in the 'public' folder, the path would be like '/icons/railing.png'
     { id: 'railing', name: 'Railing', icon: '/public/railing.png' }, // Example URL
-    { id: 'deck', name: 'Deck', icon: '/public/deck.png' },       // Example URL
+    { id: 'deck', name: 'Deck', icon: 'https://raw.githubusercontent.com/TUDS-Apps/salesprojecttracker/refs/heads/main/public/deck.png' },       // Example URL
     { id: 'hardscapes', name: 'Hardscapes', icon: '/public/hardscapes.png' },       // Example URL
     { id: 'fence', name: 'Fence', icon: '/public/fence.png' },       // Example URL
     { id: 'pergola', name: 'Pergola', icon: '/public/pergola.png' },   // Example URL
