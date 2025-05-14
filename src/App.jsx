@@ -233,7 +233,7 @@ const ProjectIcon = ({ project, onDragStart }) => (
         className="flex flex-col items-center justify-center p-2 m-1 border-2 border-dashed border-gray-300 rounded-lg cursor-grab hover:bg-gray-100 transition-colors aspect-square"
         title={project.name}> {/* Tooltip for project name */}
         {isIconUrl(project.icon) ? (
-            <img src={project.icon} alt={project.name} className="w-12 h-12 sm:w-16 sm:h-16 object-contain pointer-events-none" 
+            <img src={project.icon} alt={project.name} className="w-16 h-16 sm:w-16 sm:h-16 object-contain pointer-events-none" 
                  onError={(e) => { e.target.style.display='none'; /* Hide if image fails */ }}/>
         ) : (
             <span className="text-4xl sm:text-5xl pointer-events-none">{project.icon}</span>
