@@ -19,12 +19,12 @@ const SALESPERSONS = [
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 const PROJECT_TYPES = [
-    { id: 'railing', name: 'Railing', icon: 'railing.png' },
-    { id: 'deck', name: 'Deck', icon: 'deck.png' },
-    { id: 'hardscapes', name: 'Hardscapes', icon: 'hardscapes.png' },
-    { id: 'fence', name: 'Fence', icon: 'fence.png' },
-    { id: 'pergola', name: 'Pergola', icon: 'pergola.png' },
-    { id: 'turf', name: 'Turf', icon: 'turf.png' },
+    { id: 'railing', name: 'Railing', icon: 'railing.png' }, // Assuming railing.png is in public folder or accessible path
+    { id: 'deck', name: 'Deck', icon: 'deck.png' }, // Assuming deck.png is in public folder or accessible path
+    { id: 'hardscapes', name: 'Hardscapes', icon: 'hardscapes.png' }, // Assuming hardscapes.png is in public folder or accessible path
+    { id: 'fence', name: 'Fence', icon: 'fence.png' }, // Assuming fence.png is in public folder or accessible path
+    { id: 'pergola', name: 'Pergola', icon: 'pergola.png' }, // Assuming pergola.png is in public folder or accessible path
+    { id: 'turf', name: 'Turf', icon: 'turf.png' }, // Assuming turf.png is in public folder or accessible path
 ];
 
 const MONTHLY_GOAL = 60;
@@ -35,7 +35,7 @@ const LOCATIONS = {
     SASKATOON: { id: 'saskatoon', name: 'Saskatoon', abbreviation: 'SKTN', tileColor: 'bg-green-100/80 border-green-400', bucketColor: 'border-green-400 bg-green-50 hover:bg-green-100', textColor: 'text-green-700', bucketOverColor: 'border-green-600 bg-green-100 scale-105' }
 };
 
-// Helper function to check if the icon string is a URL
+// Helper function to check if the icon string is a URL or a local path
 const isIconUrl = (iconString) => typeof iconString === 'string' && (iconString.startsWith('http') || iconString.startsWith('/') || iconString.includes('.'));
 
 // --- Context for Application State ---
@@ -43,22 +43,20 @@ const AppContext = createContext();
 
 const AppProvider = ({ children }) => {
     const [loggedProjects, setLoggedProjects] = useState([]);
-    const [currentPage, setCurrentPage] = useState('input'); // Default to input page
+    const [currentPage, setCurrentPage] = useState('input');
     const [isLoading, setIsLoading] = useState(true);
 
-    // Effect to set initial page based on hash or localStorage
     useEffect(() => {
         const getInitialPage = () => {
             const hash = window.location.hash;
             if (hash === '#/display') return 'display';
             if (hash === '#/input') return 'input';
             const storedPage = localStorage.getItem('salesTrackerCurrentPage');
-            return storedPage === 'display' ? 'display' : 'input'; // Default to input if not display
+            return storedPage === 'display' ? 'display' : 'input';
         };
         setCurrentPage(getInitialPage());
     }, []);
 
-    // Effect to subscribe to Firebase project updates
     useEffect(() => {
         setIsLoading(true);
         const q = query(collection(db, PROJECTS_COLLECTION), orderBy('timestamp', 'desc'));
@@ -68,30 +66,26 @@ const AppProvider = ({ children }) => {
             setIsLoading(false);
         }, (error) => {
             console.error("Error fetching projects: ", error);
-            // Avoid using alert for better UX, consider a toast or inline message
-            // For now, keeping alert as per original code's error handling style
             alert("Could not fetch project data. Please check console for errors.");
             setIsLoading(false);
         });
-        return () => unsubscribe(); // Cleanup subscription on unmount
+        return () => unsubscribe();
     }, []);
 
-    // Function to handle page changes and update localStorage/hash
     const handleSetCurrentPage = (page) => {
         setCurrentPage(page);
         localStorage.setItem('salesTrackerCurrentPage', page);
         window.location.hash = page === 'display' ? '#/display' : '#/input';
     };
 
-    // Function to add a project to Firebase
     const addProjectToFirebase = async (salespersonId, projectTypeId, locationId) => {
         const salesperson = SALESPERSONS.find(s => s.id === salespersonId);
         const projectType = PROJECT_TYPES.find(p => p.id === projectTypeId);
-        const location = LOCATIONS[locationId.toUpperCase()]; // Ensure locationId matches keys in LOCATIONS
+        const location = LOCATIONS[locationId.toUpperCase()];
 
         if (!salesperson || !projectType || !location) {
             alert("Error: Invalid salesperson, project type, or location selected.");
-            return false; // Indicate failure
+            return false;
         }
         try {
             await addDoc(collection(db, PROJECTS_COLLECTION), {
@@ -99,20 +93,19 @@ const AppProvider = ({ children }) => {
                 salespersonInitials: salesperson.initials,
                 salespersonName: salesperson.name,
                 projectTypeId,
-                projectIcon: projectType.icon, // Store the icon string (URL or emoji)
+                projectIcon: projectType.icon,
                 projectName: projectType.name,
-                location: location.id, // Store location ID (e.g., 'regina')
+                location: location.id,
                 timestamp: serverTimestamp(),
             });
-            return true; // Indicate success
+            return true;
         } catch (error) {
             console.error("Error adding project: ", error);
             alert("Error logging project. Please check console for details.");
-            return false; // Indicate failure
+            return false;
         }
     };
     
-    // Function to reset all project data in Firebase
     const resetMonthlyDataInFirebase = async () => {
         if (window.confirm("ARE YOU SURE you want to RESET ALL PROJECT DATA? This action cannot be undone.")) {
             setIsLoading(true);
@@ -130,7 +123,6 @@ const AppProvider = ({ children }) => {
         }
     };
 
-    // Provide state and functions to child components
     return (
         <AppContext.Provider value={{ 
             loggedProjects, addProject: addProjectToFirebase, currentPage, 
@@ -144,15 +136,12 @@ const AppProvider = ({ children }) => {
 };
 
 // --- UI Components ---
-
-// Generic Card component for styling content blocks
 const Card = ({ children, className = '' }) => (
     <div className={`bg-white shadow-xl rounded-lg p-6 md:p-8 ${className}`}>
         {children}
     </div>
 );
 
-// Generic Button component with variants
 const Button = ({ children, onClick, className = '', variant = 'primary', disabled = false }) => {
     const styles = {
         primary: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500',
@@ -167,7 +156,6 @@ const Button = ({ children, onClick, className = '', variant = 'primary', disabl
     );
 };
 
-// Loading spinner component
 const LoadingSpinner = ({ message = "Loading..."}) => (
     <div className="flex flex-col items-center justify-center p-10 text-gray-700">
         <svg className="animate-spin h-10 w-10 text-blue-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -183,25 +171,25 @@ const createConfettiPiece = () => {
     const piece = document.createElement('div');
     piece.style.position = 'fixed';
     piece.style.left = `${Math.random() * 100}vw`;
-    piece.style.top = `${Math.random() * -20 - 10}vh`; // Start further above screen
-    piece.style.width = `${Math.random() * 12 + 6}px`; // Slightly larger pieces
+    piece.style.top = `${Math.random() * -20 - 10}vh`;
+    piece.style.width = `${Math.random() * 12 + 6}px`;
     piece.style.height = piece.style.width;
-    piece.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 60%)`; // Brighter colors
-    piece.style.opacity = '0'; // Start invisible
-    piece.style.zIndex = '10001';
-    piece.style.borderRadius = `${Math.random() > 0.5 ? '50%' : '0px'}`; // Mix of circles and squares
+    piece.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 60%)`;
+    piece.style.opacity = '0';
+    piece.style.zIndex = '10001'; // Higher than the prompt for confetti on top
+    piece.style.borderRadius = `${Math.random() > 0.5 ? '50%' : '0px'}`;
     piece.style.transform = `rotate(${Math.random() * 360}deg)`;
     document.body.appendChild(piece);
     return piece;
 };
 
 const animateConfettiPiece = (piece) => {
-    const fallDuration = Math.random() * 3 + 2.5; // 2.5 to 5.5 seconds (more exciting)
-    const swayAmount = Math.random() * 200 - 100; // -100 to 100 vw for horizontal sway (more exciting)
-    const rotation = Math.random() * 720 + 360; // More rotation
+    const fallDuration = Math.random() * 3 + 2.5; 
+    const swayAmount = Math.random() * 200 - 100; 
+    const rotation = Math.random() * 720 + 360; 
 
     piece.animate([
-        { transform: `translate3d(0, 0, 0) rotate(${piece.style.transform.match(/\d+/)[0]}deg)`, opacity: 1 }, // Use initial rotation
+        { transform: `translate3d(0, 0, 0) rotate(${piece.style.transform.match(/\d+/)[0]}deg)`, opacity: 1 },
         { transform: `translate3d(${swayAmount}px, 110vh, 0) rotate(${rotation}deg)`, opacity: 0 }
     ], {
         duration: fallDuration * 1000,
@@ -216,39 +204,41 @@ const animateConfettiPiece = (piece) => {
     }, fallDuration * 1000);
 };
 
-const triggerConfetti = (count = 150) => { // Increased default count for more excitement
+const triggerConfetti = (count = 150) => {
     for (let i = 0; i < count; i++) {
         setTimeout(() => {
             const piece = createConfettiPiece();
             animateConfettiPiece(piece);
-        }, i * 15); // Stagger creation slightly more
+        }, i * 15);
     }
 };
 
 // --- Input Page Components ---
-
-// Draggable Project Icon
 const ProjectIcon = ({ project, onDragStart }) => (
+    // The tile itself (this div) remains the same size due to aspect-square and grid context
     <div draggable onDragStart={(e) => onDragStart(e, project.id)}
-        className="flex flex-col items-center justify-center p-2 m-1 border-2 border-dashed border-gray-300 rounded-lg cursor-grab hover:bg-gray-100 transition-colors aspect-square"
-        title={project.name}> {/* Tooltip for project name */}
+        className="flex flex-col items-center justify-center p-1 sm:p-2 m-1 border-2 border-dashed border-gray-300 rounded-lg cursor-grab hover:bg-gray-100 transition-colors aspect-square"
+        title={project.name}>
         {isIconUrl(project.icon) ? (
-            <img src={project.icon} alt={project.name} className="w-16 h-16 sm:w-16 sm:h-16 object-contain pointer-events-none" 
-                 onError={(e) => { e.target.style.display='none'; /* Hide if image fails */ }}/>
+            // Increased image size. object-contain will ensure it fits if larger than padded area.
+            <img 
+                src={project.icon} 
+                alt={project.name} 
+                className="w-20 h-20 sm:w-24 sm:h-24 object-contain pointer-events-none" // Increased size
+                onError={(e) => { e.target.style.display='none'; }}
+            />
         ) : (
-            <span className="text-4xl sm:text-5xl pointer-events-none">{project.icon}</span>
+            // Increased emoji size
+            <span className="text-5xl sm:text-6xl pointer-events-none">{project.icon}</span> // Increased size
         )}
-        {/* Project name text below icon is removed as per original code */}
     </div>
 );
 
-// Drop Zone for Location
 const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOver, projectCount }) => (
     <div onDrop={(e) => onDrop(e, locationDetails.id)} onDragOver={onDragOver} onDragLeave={onDragLeave}
         className={`mt-6 p-6 md:p-8 border-4 border-dashed rounded-xl text-center transition-all duration-200 ease-in-out min-h-[150px] flex flex-col justify-center items-center
                   ${isOver ? locationDetails.bucketOverColor : locationDetails.bucketColor}`}>
         <h3 className={`text-xl font-semibold mb-2 ${locationDetails.textColor}`}>{locationDetails.name} Projects</h3>
-        {/* Using a generic box icon as an example */}
         <svg className={`w-12 h-12 mb-2 ${isOver ? locationDetails.textColor : locationDetails.textColor } opacity-70`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
         <p className={`text-md font-medium ${locationDetails.textColor}`}>
             {isOver ? "Release to log!" : "Drag Project Here"}
@@ -257,13 +247,11 @@ const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOv
     </div>
 );
 
-// Main Input Page
 const InputPage = () => {
     const { addProject, salespersons, projectTypes, setCurrentPage, isLoading, locations, loggedProjects } = useContext(AppContext);
     const [selectedSalesperson, setSelectedSalesperson] = useState(''); 
-    const [draggingOverBucket, setDraggingOverBucket] = useState(null); // Tracks which bucket is being dragged over
+    const [draggingOverBucket, setDraggingOverBucket] = useState(null);
     const [congratsData, setCongratsData] = useState({ show: false, name: '', project: '', location: '' });
-
 
     const handleDragStart = (e, projectId) => e.dataTransfer.setData('projectId', projectId);
 
@@ -282,8 +270,8 @@ const InputPage = () => {
                     project: SProject ? SProject.name : 'a project',
                     location: locations[locationId.toUpperCase()].name
                 });
-                triggerConfetti(150); // Trigger more exciting confetti
-                setTimeout(() => setCongratsData({ show: false, name: '', project: '', location: '' }), 3000); // Show for 3 seconds
+                triggerConfetti(150);
+                setTimeout(() => setCongratsData({ show: false, name: '', project: '', location: '' }), 3000); // Congrats banner duration
             }
         } else if (!selectedSalesperson) {
             alert("Please select a salesperson first.");
@@ -291,24 +279,21 @@ const InputPage = () => {
     };
 
     const handleDragOver = (e, locationId) => {
-        e.preventDefault(); // Necessary to allow dropping
+        e.preventDefault();
         setDraggingOverBucket(locationId);
     };
     
     const handleDragLeave = () => setDraggingOverBucket(null);
 
-    // Helper to get project count for a specific location
     const getProjectCountForLocation = (locationId) => loggedProjects.filter(p => p.location === locationId).length;
 
-    // Calculate salesperson stats for leaderboard
     const salespersonStats = SALESPERSONS.map(sp => ({
         ...sp,
         projectCount: loggedProjects.filter(p => p.salespersonId === sp.id).length
-    })).sort((a, b) => b.projectCount - a.projectCount); // Sort by project count descending
+    })).sort((a, b) => b.projectCount - a.projectCount);
 
     return (
         <div className="container mx-auto p-4 md:p-6 max-w-5xl">
-            {/* Congrats Popup */}
             {congratsData.show && (
                 <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10000] p-4">
                     <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl text-center max-w-md w-full">
@@ -332,10 +317,6 @@ const InputPage = () => {
 
                 {isLoading && <LoadingSpinner message="Connecting to Database..." />}
                 
-                {/* This is the old success message, can be removed if congrats popup is preferred */}
-                {/* {showSuccessMessage.show && ( ... )} */}
-
-
                 <div className="mb-6">
                     <label htmlFor="salesperson" className="block text-lg font-medium text-gray-700 mb-2">Salesperson:</label>
                     <select id="salesperson" value={selectedSalesperson} onChange={(e) => setSelectedSalesperson(e.target.value)}
@@ -366,70 +347,56 @@ const InputPage = () => {
                 </div>
             </Card>
 
-            {/* Leaderboards Section */}
-            {!isLoading && (
-            <div className="mt-8 grid md:grid-cols-2 gap-6">
-                <Card className="bg-gray-50">
-                    <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Location Totals</h2>
-                    {/* Updated to display Regina and Saskatoon side-by-side */}
-                    <div className="grid sm:grid-cols-2 gap-3 space-y-3 sm:space-y-0">
-                        <div className={`p-4 rounded-lg shadow ${locations.REGINA.bucketColor} ${locations.REGINA.textColor}`}>
-                            <h3 className="text-lg font-medium">{locations.REGINA.name}:</h3>
-                            <p className="text-3xl font-bold">{getProjectCountForLocation(locations.REGINA.id)}</p>
-                        </div>
-                        <div className={`p-4 rounded-lg shadow ${locations.SASKATOON.bucketColor} ${locations.SASKATOON.textColor}`}>
-                            <h3 className="text-lg font-medium">{locations.SASKATOON.name}:</h3>
-                            <p className="text-3xl font-bold">{getProjectCountForLocation(locations.SASKATOON.id)}</p>
-                        </div>
-                    </div>
-                </Card>
-                <Card className="bg-gray-50">
-                    <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Salesperson Leaderboard</h2>
-                    {salespersonStats.length > 0 ? (
-                        <ul className="space-y-2">
-                            {salespersonStats.map((sp, index) => (
-                                <li key={sp.id} className={`p-3 rounded-lg shadow flex justify-between items-center text-gray-700 ${index === 0 ? 'bg-yellow-100 border-yellow-400' : index === 1 ? 'bg-gray-200 border-gray-400' : index === 2 ? 'bg-orange-100 border-orange-400' : 'bg-white border-gray-300'}`}>
-                                    <span className="font-medium text-lg">
-                                        {index + 1}. {sp.name}
-                                        {index === 0 && ' 🥇'}
-                                        {index === 1 && ' 🥈'}
-                                        {index === 2 && ' 🥉'}
-                                    </span>
-                                    <span className="font-bold text-xl">{sp.projectCount}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-gray-600 text-center">No projects logged yet.</p>
-                    )}
-                </Card>
-            </div>
+            {/* Leaderboards Section - Only Salesperson Leaderboard now */}
+            {!isLoading && salespersonStats.length > 0 && (
+                <div className="mt-8"> {/* Removed grid md:grid-cols-2 if only one card */}
+                    <Card className="bg-gray-50">
+                        <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Salesperson Leaderboard</h2>
+                        {salespersonStats.length > 0 ? (
+                            <ul className="space-y-2">
+                                {salespersonStats.map((sp, index) => (
+                                    <li key={sp.id} className={`p-3 rounded-lg shadow flex justify-between items-center text-gray-700 ${index === 0 ? 'bg-yellow-100 border-yellow-400' : index === 1 ? 'bg-gray-200 border-gray-400' : index === 2 ? 'bg-orange-100 border-orange-400' : 'bg-white border-gray-300'}`}>
+                                        <span className="font-medium text-lg">
+                                            {index + 1}. {sp.name}
+                                            {index === 0 && ' 🥇'}
+                                            {index === 1 && ' 🥈'}
+                                            {index === 2 && ' 🥉'}
+                                        </span>
+                                        <span className="font-bold text-xl">{sp.projectCount}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-gray-600 text-center">No projects logged yet.</p>
+                        )}
+                    </Card>
+                </div>
             )}
+             {!isLoading && salespersonStats.length === 0 && (
+                 <div className="mt-8 text-center text-gray-500">
+                    <p>No salesperson data to display yet.</p>
+                 </div>
+             )}
         </div>
     );
 };
 
 // --- Display Page Components ---
-
-// Individual Project Cell for the Display Grid
 const ProjectGridCell = ({ project, locationMap }) => {
     const locationDetails = Object.values(locationMap).find(loc => loc.id === project.location);
     const tileBgColor = locationDetails ? locationDetails.tileColor : 'bg-gray-100/80 border-gray-400';
 
     return (
         <div className={`aspect-square shadow-lg rounded-lg flex flex-col items-center justify-center p-1.5 sm:p-2 text-center border ${tileBgColor} hover:shadow-xl transition-shadow`}>
-            {/* Icon container (80% of cell) */}
             <div className="w-[80%] h-[80%] flex items-center justify-center">
                 {isIconUrl(project.projectIcon) ? (
                     <img src={project.projectIcon} alt={project.projectName}
                          className="max-w-full max-h-full object-contain"
                          onError={(e) => { e.target.style.display='none'; }}/>
                 ) : (
-                    // Adjust text size to be large, it will be contained by the 80% div
                     <span className="text-5xl sm:text-6xl md:text-7xl lg:text-7xl" style={{lineHeight: 1}}>{project.projectIcon}</span>
                 )}
             </div>
-            {/* Text container */}
             <div className="w-full text-center mt-auto pt-0.5">
                 <p className="text-sm sm:text-lg font-semibold text-gray-800 truncate px-1">{project.salespersonName}</p>
                 {locationDetails && <p className="text-xs sm:text-base text-gray-700">{locationDetails.abbreviation}</p>}
@@ -438,31 +405,27 @@ const ProjectGridCell = ({ project, locationMap }) => {
     );
 };
 
-// Main Display Page
 const DisplayPage = () => {
     const { loggedProjects, monthlyGoal, setCurrentPage, resetMonthlyData, isLoading, locations } = useContext(AppContext);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Effect to update time every second
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(timer); // Cleanup timer on unmount
+        return () => clearInterval(timer);
     }, []);
 
     const projectsToDisplay = loggedProjects.slice(0, monthlyGoal); 
     const emptyCellsCount = Math.max(0, monthlyGoal - projectsToDisplay.length);
     
-    // Dynamically calculate number of columns for the grid
-    // Aims for squarish cells, typically 5 columns for 30 items (6 rows)
-    const numColumns = Math.min(5, Math.max(3, Math.ceil(Math.sqrt(monthlyGoal * 0.7))));
+    const numColumns = 6; // Fixed to 6 columns for display board
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-2 sm:p-4 md:p-6 flex flex-col items-center justify-center">
-            <div className="w-full max-w-[2160px] h-full flex flex-col"> {/* Max width for large displays */}
+            <div className="w-full max-w-[2160px] h-full flex flex-col">
                 <header className="w-full mb-2 md:mb-4 text-center py-1 sm:py-2">
                     <div className="flex justify-between items-center mb-2 sm:mb-3 px-2">
                         <img src="TUDS Logo Colour.png" alt="TUDS Logo" 
-                             className="h-16 sm:h-20 md:h-24 rounded" // Adjusted logo size
+                             className="h-16 sm:h-20 md:h-24 rounded"
                              onError={(e) => {e.target.onerror=null; e.target.src='https://placehold.co/200x60/CCCCCC/FFFFFF?text=TUDS+Logo'}}/>
                         <div className="text-right">
                             <p className="text-md sm:text-lg md:text-xl font-medium text-gray-300">
@@ -491,13 +454,11 @@ const DisplayPage = () => {
                             {projectsToDisplay.map(proj => (
                                 <ProjectGridCell key={proj.id} project={proj} locationMap={locations} />
                             ))}
-                            {/* Render empty cells to fill up to the monthly goal */}
                             {Array.from({ length: emptyCellsCount }).map((_, idx) => (
                                 <div key={`empty_${idx}`} className="aspect-square bg-slate-800/70 rounded-lg opacity-60"></div>
                             ))}
                         </div>
                     )}
-                    {/* Message if no projects are logged */}
                     { !isLoading && loggedProjects.length === 0 && emptyCellsCount === monthlyGoal && (
                         <div className="text-center py-10">
                             <p className="text-2xl sm:text-3xl text-gray-400">No projects logged yet for this month.</p>
@@ -522,19 +483,18 @@ const DisplayPage = () => {
 function App() {
     const { currentPage, setCurrentPage: contextSetCurrentPage } = useContext(AppContext);
 
-    // Effect to handle URL hash changes for navigation
     useEffect(() => {
         const handleHashChange = () => {
             const hash = window.location.hash;
-            if (contextSetCurrentPage) { // Ensure context function is available
+            if (contextSetCurrentPage) {
                 if (hash === '#/display') contextSetCurrentPage('display');
-                else if (hash === '#/input' || hash === '') contextSetCurrentPage('input'); // Default to input
+                else if (hash === '#/input' || hash === '') contextSetCurrentPage('input');
             }
         };
         window.addEventListener('hashchange', handleHashChange, false);
-        handleHashChange(); // Call on initial load
+        handleHashChange();
         return () => window.removeEventListener('hashchange', handleHashChange, false);
-    }, [contextSetCurrentPage]); // Rerun if context function changes
+    }, [contextSetCurrentPage]);
 
     return (
         <div className="min-h-screen bg-gray-100 font-sans">
@@ -543,7 +503,6 @@ function App() {
     );
 }
 
-// Export the App wrapped with the Provider
 export default function ProvidedApp() {
   return (
     <AppProvider>
