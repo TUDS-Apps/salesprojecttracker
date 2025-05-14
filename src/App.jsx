@@ -374,11 +374,11 @@ const InputPage = () => {
                     {/* Updated to display Regina and Saskatoon side-by-side */}
                     <div className="grid sm:grid-cols-2 gap-3 space-y-3 sm:space-y-0">
                         <div className={`p-4 rounded-lg shadow ${locations.REGINA.bucketColor} ${locations.REGINA.textColor}`}>
-                            <h3 className="text-lg font-medium">{locations.REGINA.name} Projects:</h3>
+                            <h3 className="text-lg font-medium">{locations.REGINA.name}:</h3>
                             <p className="text-3xl font-bold">{getProjectCountForLocation(locations.REGINA.id)}</p>
                         </div>
                         <div className={`p-4 rounded-lg shadow ${locations.SASKATOON.bucketColor} ${locations.SASKATOON.textColor}`}>
-                            <h3 className="text-lg font-medium">{locations.SASKATOON.name} Projects:</h3>
+                            <h3 className="text-lg font-medium">{locations.SASKATOON.name}:</h3>
                             <p className="text-3xl font-bold">{getProjectCountForLocation(locations.SASKATOON.id)}</p>
                         </div>
                     </div>
