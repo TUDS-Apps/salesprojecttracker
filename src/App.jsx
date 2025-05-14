@@ -20,17 +20,17 @@ const SALESPERSONS = [
 
 const PROJECT_TYPES = [
     // Replace these example icon URLs with your actual icon URLs or emojis
-    // If using local images in the 'public' folder, the path would be like '/icons/railing.png'
-    { id: 'railing', name: 'Railing', icon: 'railing.png' }, // Example URL
-    { id: 'deck', name: 'Deck', icon: 'deck.png' },       // Example URL
-    { id: 'hardscapes', name: 'Hardscapes', icon: '/public/hardscapes.png' },       // Example URL
-    { id: 'fence', name: 'Fence', icon: '/public/fence.png' },       // Example URL
-    { id: 'pergola', name: 'Pergola', icon: '/public/pergola.png' },   // Example URL
-    { id: 'turf', name: 'Turf', icon: '/public/turf.png' },         // Example URL
+    // If using local images in the 'public' folder, the path would be like 'railing.png'
+    { id: 'railing', name: 'Railing', icon: 'railing.png' },
+    { id: 'deck', name: 'Deck', icon: 'deck.png' },
+    { id: 'hardscapes', name: 'Hardscapes', icon: 'hardscapes.png' },
+    { id: 'fence', name: 'Fence', icon: 'fence.png' },
+    { id: 'pergola', name: 'Pergola', icon: 'pergola.png' },
+    { id: 'turf', name: 'Turf', icon: 'turf.png' },
 ];
 
 // --- Monthly Goal - Manually change this value when the target changes ---
-const MONTHLY_GOAL = 30; // Example: change to 40 if the target is 40
+const MONTHLY_GOAL = 60; // Example: change to 40 if the target is 40
 // ---
 
 const PROJECTS_COLLECTION = 'projects';
@@ -333,14 +333,14 @@ const DisplayPage = () => {
             <div className="w-full max-w-[2100px] h-full flex flex-col">
                 <header className="w-full mb-4 md:mb-6 text-center py-2">
                      <div className="flex justify-between items-center mb-3 sm:mb-4">
-                        <img src="https://placehold.co/200x70/ffffff/333333?text=YourLogo&font=roboto" alt="Company Logo" className="h-12 sm:h-16 rounded" onError={(e) => e.target.src='https://placehold.co/200x70/CCCCCC/FFFFFF?text=Logo_Err'}/>
+                        <img src="TUDS Logo Colour.png" alt="The Ultimate Deck Shop" className="h-12 sm:h-16 rounded" onError={(e) => e.target.src='https://placehold.co/200x70/CCCCCC/FFFFFF?text=Logo_Err'}/>
                         <div className="text-right">
                             <p className="text-lg sm:text-xl md:text-2xl font-medium text-gray-300">{currentTime.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
                             <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-100">{currentTime.toLocaleTimeString()}</p>
                         </div>
                     </div>
                     <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-teal-400 to-green-400 leading-tight">
-                        Project Achievements
+                        Customer Projects This Week!
                     </h1>
                     <p className="mt-2 text-3xl sm:text-4xl md:text-5xl font-bold text-yellow-400">
                         {loggedProjects.length} <span className="text-2xl sm:text-3xl text-gray-300">of</span> {monthlyGoal} <span className="text-2xl sm:text-3xl text-gray-300">Done!</span>
