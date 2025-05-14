@@ -188,7 +188,7 @@ const createConfettiPiece = () => {
     piece.style.height = piece.style.width;
     piece.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 60%)`; // Brighter colors
     piece.style.opacity = '0'; // Start invisible
-    piece.style.zIndex = '9999';
+    piece.style.zIndex = '10001';
     piece.style.borderRadius = `${Math.random() > 0.5 ? '50%' : '0px'}`; // Mix of circles and squares
     piece.style.transform = `rotate(${Math.random() * 360}deg)`;
     document.body.appendChild(piece);
@@ -283,7 +283,7 @@ const InputPage = () => {
                     location: locations[locationId.toUpperCase()].name
                 });
                 triggerConfetti(150); // Trigger more exciting confetti
-                setTimeout(() => setCongratsData({ show: false, name: '', project: '', location: '' }), 6000); // Show for 6 seconds
+                setTimeout(() => setCongratsData({ show: false, name: '', project: '', location: '' }), 3000); // Show for 3 seconds
             }
         } else if (!selectedSalesperson) {
             alert("Please select a salesperson first.");
