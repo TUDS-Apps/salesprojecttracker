@@ -27,6 +27,7 @@ const PROJECT_TYPES = [
     { id: 'fence', name: 'Fence', icon: 'https://placehold.co/64x64/transparent/333333?text=🧱&font=roboto' },       // Example URL
     { id: 'pergola', name: 'Pergola', icon: 'https://placehold.co/64x64/transparent/333333?text=🌿&font=roboto' },   // Example URL
     { id: 'turf', name: 'Turf', icon: 'https://placehold.co/64x64/transparent/333333?text=🌱&font=roboto' },         // Example URL
+    // { id: 'backyard', name: 'Whole Backyard', icon: 'https://placehold.co/64x64/transparent/333333?text=🏡&font=roboto' } // Removed "Whole Backyard"
 ];
 
 // --- Monthly Goal - Manually change this value when the target changes ---
@@ -41,9 +42,6 @@ const LOCATIONS = {
 
 // Helper function to check if an icon string is a URL or path
 const isIconUrl = (iconString) => {
-    // Check if the string starts with http, https, or a slash (for relative paths)
-    // Also check if it contains a period, which is common in file extensions for images.
-    // This is a basic check and might need refinement for more complex scenarios.
     return typeof iconString === 'string' && (iconString.startsWith('http') || iconString.startsWith('/') || iconString.includes('.'));
 };
 
@@ -55,20 +53,17 @@ const AppProvider = ({ children }) => {
     const [currentPage, setCurrentPage] = useState('input');
     const [isLoading, setIsLoading] = useState(true);
 
-    // Effect to determine initial page based on URL hash or localStorage
     useEffect(() => {
         const getInitialPage = () => {
             const hash = window.location.hash;
             if (hash === '#/display') return 'display';
             if (hash === '#/input') return 'input';
-            // Fallback to localStorage if no specific hash
             const storedPage = localStorage.getItem('salesTrackerCurrentPage');
-            return storedPage === 'display' ? 'display' : 'input'; // Default to 'input'
+            return storedPage === 'display' ? 'display' : 'input';
         };
         setCurrentPage(getInitialPage());
-    }, []); // Runs once on initial mount
+    }, []);
 
-    // Effect to fetch and listen for real-time project updates from Firestore
     useEffect(() => {
         setIsLoading(true);
         const q = query(collection(db, PROJECTS_COLLECTION), orderBy('timestamp', 'desc'));
@@ -81,22 +76,19 @@ const AppProvider = ({ children }) => {
             alert("Could not fetch project data. Please check your internet connection or Firebase setup.");
             setIsLoading(false);
         });
-        // Cleanup listener on component unmount
         return () => unsubscribe();
-    }, []); // Runs once on initial mount
+    }, []);
 
-    // Function to handle setting the current page and updating localStorage/URL hash
     const handleSetCurrentPage = (page) => {
         setCurrentPage(page);
         localStorage.setItem('salesTrackerCurrentPage', page);
         window.location.hash = page === 'display' ? '#/display' : '#/input';
     };
 
-    // Function to add a new project to Firebase
     const addProjectToFirebase = async (salespersonId, projectTypeId, locationId) => {
         const salesperson = SALESPERSONS.find(s => s.id === salespersonId);
         const projectType = PROJECT_TYPES.find(p => p.id === projectTypeId);
-        const location = LOCATIONS[locationId.toUpperCase()]; // Ensure locationId matches keys in LOCATIONS
+        const location = LOCATIONS[locationId.toUpperCase()];
 
         if (!salesperson || !projectType || !location) {
             console.error("Invalid salesperson, project type, or location:", {salespersonId, projectTypeId, locationId});
@@ -109,30 +101,25 @@ const AppProvider = ({ children }) => {
                 salespersonInitials: salesperson.initials,
                 salespersonName: salesperson.name,
                 projectTypeId,
-                projectIcon: projectType.icon, // This will now store the URL or emoji
+                projectIcon: projectType.icon,
                 projectName: projectType.name,
-                location: location.id, // Save location id (e.g., 'regina', 'saskatoon')
-                timestamp: serverTimestamp(), // Use server timestamp for consistency
+                location: location.id,
+                timestamp: serverTimestamp(),
             });
-            // Real-time listener (onSnapshot) will update loggedProjects state automatically
         } catch (error) {
             console.error("Error adding project to Firestore: ", error);
             alert("Error logging project. Please try again.");
         }
     };
     
-    // Function to reset all monthly data from Firebase
     const resetMonthlyDataInFirebase = async () => {
         if (window.confirm("Are you sure you want to RESET ALL project data for the month from the database? This cannot be undone.")) {
             setIsLoading(true);
             try {
                 const projectsQuerySnapshot = await getDocs(collection(db, PROJECTS_COLLECTION));
-                // For deleting multiple documents, batch writes are more efficient if available/preferred,
-                // but iterating and deleting is fine for this scale.
                 const deletePromises = projectsQuerySnapshot.docs.map(doc => deleteDoc(doc.ref));
                 await Promise.all(deletePromises);
                 alert("All project data has been reset from the database.");
-                // onSnapshot will automatically update the local state to an empty array
             } catch (error) {
                 console.error("Error resetting data in Firestore: ", error);
                 alert("Error resetting data. Please try again.");
@@ -142,19 +129,12 @@ const AppProvider = ({ children }) => {
         }
     };
 
-    // Provide state and functions to child components through context
     return (
         <AppContext.Provider value={{ 
-            loggedProjects, 
-            addProject: addProjectToFirebase, 
-            currentPage, 
-            setCurrentPage: handleSetCurrentPage, 
-            monthlyGoal: MONTHLY_GOAL, 
-            salespersons: SALESPERSONS, 
-            projectTypes: PROJECT_TYPES, 
-            resetMonthlyData: resetMonthlyDataInFirebase, 
-            isLoading, 
-            locations: LOCATIONS // Provide locations context for buckets and tiles
+            loggedProjects, addProject: addProjectToFirebase, currentPage, 
+            setCurrentPage: handleSetCurrentPage, monthlyGoal: MONTHLY_GOAL, 
+            salespersons: SALESPERSONS, projectTypes: PROJECT_TYPES, 
+            resetMonthlyData: resetMonthlyDataInFirebase, isLoading, locations: LOCATIONS
         }}>
             {children}
         </AppContext.Provider>
@@ -162,24 +142,17 @@ const AppProvider = ({ children }) => {
 };
 
 // --- Reusable UI Components ---
-const Card = ({ children, className = '' }) => (
-    <div className={`bg-white shadow-xl rounded-lg p-6 md:p-8 ${className}`}>
-        {children}
-    </div>
-);
+const Card = ({ children, className = '' }) => <div className={`bg-white shadow-xl rounded-lg p-6 md:p-8 ${className}`}>{children}</div>;
 
 const Button = ({ children, onClick, className = '', variant = 'primary', disabled = false }) => {
-    const baseStyle = 'px-6 py-3 rounded-lg font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-opacity-75 transition-all duration-150 ease-in-out';
     const styles = {
         primary: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500',
         secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800 focus:ring-gray-400',
         danger: 'bg-red-500 hover:bg-red-600 text-white focus:ring-red-400',
     };
     return (
-        <button 
-            onClick={onClick} 
-            disabled={disabled}
-            className={`${baseStyle} ${styles[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
+        <button onClick={onClick} disabled={disabled}
+            className={`px-6 py-3 rounded-lg font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-opacity-75 transition-all ${styles[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
             {children}
         </button>
     );
@@ -197,32 +170,17 @@ const LoadingSpinner = ({ message = "Loading..."}) => (
 
 // --- Input Page Components ---
 const ProjectIcon = ({ project, onDragStart }) => (
-    // Component for displaying a draggable project icon (either image or emoji)
-    <div 
-        draggable 
-        onDragStart={(e) => onDragStart(e, project.id)}
+    <div draggable onDragStart={(e) => onDragStart(e, project.id)}
         className="flex flex-col items-center justify-center p-3 m-1.5 border-2 border-dashed border-gray-300 rounded-lg cursor-grab hover:bg-gray-100 transition-colors aspect-square"
         title={`Drag to add ${project.name}`}>
         {isIconUrl(project.icon) ? (
-            // If icon is a URL, render an img tag
             <img 
                 src={project.icon} 
                 alt={project.name} 
-                className="w-10 h-10 sm:w-12 sm:h-12 object-contain pointer-events-none" // Prevent image itself from being dragged
-                // Basic error handling for broken image links
-                onError={(e) => { 
-                    e.target.style.display='none'; // Hide the broken image
-                    // Optionally, show a fallback text or emoji if the next sibling is designed for it
-                    const fallback = e.target.nextElementSibling;
-                    if (fallback && fallback.classList.contains('fallback-icon-text')) {
-                        fallback.style.display='block';
-                    }
-                }}
+                className="w-10 h-10 sm:w-12 sm:h-12 object-contain pointer-events-none" 
+                onError={(e) => { e.target.style.display='none'; const fallback = e.target.nextElementSibling; if (fallback && fallback.classList.contains('fallback-icon-text')) { fallback.style.display='block';}}}
             />
-            // Fallback text (initially hidden, shown on image error if onError is configured to do so)
-            // <span className="fallback-icon-text text-3xl sm:text-4xl pointer-events-none hidden">❓</span>
         ) : (
-            // If icon is not a URL (e.g., an emoji), render it as text
             <span className="text-3xl sm:text-4xl pointer-events-none">{project.icon}</span>
         )}
         <span className="mt-1 text-xs text-center text-gray-700 pointer-events-none">{project.name}</span>
@@ -230,15 +188,10 @@ const ProjectIcon = ({ project, onDragStart }) => (
 );
 
 const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOver, projectCount }) => (
-    // Component for the drag-and-drop target bucket for a specific location
-    <div 
-        onDrop={(e) => onDrop(e, locationDetails.id)} 
-        onDragOver={onDragOver} 
-        onDragLeave={onDragLeave}
+    <div onDrop={(e) => onDrop(e, locationDetails.id)} onDragOver={onDragOver} onDragLeave={onDragLeave}
         className={`mt-6 p-6 md:p-8 border-4 border-dashed rounded-xl text-center transition-all duration-200 ease-in-out min-h-[150px] flex flex-col justify-center items-center
                     ${isOver ? locationDetails.bucketOverColor : locationDetails.bucketColor}`}>
         <h3 className={`text-xl font-semibold mb-2 ${locationDetails.textColor}`}>{locationDetails.name} Projects</h3>
-        {/* Bucket icon */}
         <svg className={`w-12 h-12 mb-2 ${isOver ? locationDetails.textColor : locationDetails.textColor } opacity-70`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
         <p className={`text-md font-medium ${locationDetails.textColor}`}>
             {isOver ? "Release to log!" : "Drag Project Here"}
@@ -248,42 +201,34 @@ const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOv
 );
 
 const InputPage = () => {
-    // Component for the project input page
     const { addProject, salespersons, projectTypes, setCurrentPage, isLoading, locations, loggedProjects } = useContext(AppContext);
-    const [selectedSalesperson, setSelectedSalesperson] = useState(salespersons[0]?.id || '');
-    const [draggingOverBucket, setDraggingOverBucket] = useState(null); // Tracks which bucket is being dragged over
-    const [showSuccessMessage, setShowSuccessMessage] = useState({ show: false, location: '' }); // For success feedback
+    // MODIFIED: Default selectedSalesperson to an empty string
+    const [selectedSalesperson, setSelectedSalesperson] = useState(''); 
+    const [draggingOverBucket, setDraggingOverBucket] = useState(null);
+    const [showSuccessMessage, setShowSuccessMessage] = useState({ show: false, location: '' });
 
-    // Handler for when a project icon drag starts
-    const handleDragStart = (e, projectId) => {
-        e.dataTransfer.setData('projectId', projectId); // Set data to be transferred
-    };
+    const handleDragStart = (e, projectId) => e.dataTransfer.setData('projectId', projectId);
 
-    // Handler for when a project icon is dropped onto a bucket
     const handleDrop = async (e, locationId) => {
-        e.preventDefault(); // Prevent default drop behavior
-        setDraggingOverBucket(null); // Reset dragging over state
-        const projectId = e.dataTransfer.getData('projectId'); // Get project ID from transferred data
-        if (selectedSalesperson && projectId && locationId) {
-            await addProject(selectedSalesperson, projectId, locationId); // Add project to Firebase
-            // Show success message
+        e.preventDefault();
+        setDraggingOverBucket(null);
+        const projectId = e.dataTransfer.getData('projectId');
+        if (selectedSalesperson && projectId && locationId) { // Check if salesperson is selected
+            await addProject(selectedSalesperson, projectId, locationId);
             setShowSuccessMessage({ show: true, location: locations[locationId.toUpperCase()].name });
-            setTimeout(() => setShowSuccessMessage({ show: false, location: '' }), 2500); // Hide after 2.5s
+            setTimeout(() => setShowSuccessMessage({ show: false, location: '' }), 2500);
+        } else if (!selectedSalesperson) {
+            alert("Please select a salesperson first."); // Alert if no salesperson is selected
         }
     };
 
-    // Handler for when a dragged item is over a bucket
     const handleDragOver = (e, locationId) => {
-        e.preventDefault(); // Allow dropping
-        setDraggingOverBucket(locationId); // Set which bucket is being hovered over
+        e.preventDefault();
+        setDraggingOverBucket(locationId);
     };
     
-    // Handler for when a dragged item leaves a bucket area
-    const handleDragLeave = () => {
-        setDraggingOverBucket(null); // Reset dragging over state
-    };
+    const handleDragLeave = () => setDraggingOverBucket(null);
 
-    // Helper to count projects for a specific location
     const getProjectCountForLocation = (locationId) => {
         return loggedProjects.filter(p => p.location === locationId).length;
     };
@@ -303,5 +248,169 @@ const InputPage = () => {
                     </div>
                 )}
 
-                {/* Salesperson Selection Dropdown */}
-                <div classNam
+                <div className="mb-6">
+                    <label htmlFor="salesperson" className="block text-lg font-medium text-gray-700 mb-2">Salesperson:</label>
+                    {/* MODIFIED: Added default "Select Salesperson" option */}
+                    <select 
+                        id="salesperson" 
+                        value={selectedSalesperson} 
+                        onChange={(e) => setSelectedSalesperson(e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 text-lg" 
+                        disabled={isLoading}
+                        required // Makes it a required field in terms of form validation, though JS handles logic
+                    >
+                        <option value="" disabled>
+                            Select Salesperson
+                        </option>
+                        {salespersons.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+                    </select>
+                </div>
+
+                <div className="mb-6">
+                    <h2 className="text-xl font-semibold text-gray-700 mb-3">Available Projects:</h2>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2">
+                        {projectTypes.map(pt => <ProjectIcon key={pt.id} project={pt} onDragStart={handleDragStart} />)}
+                    </div>
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+                    <LocationBucket 
+                        locationDetails={locations.REGINA} 
+                        onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, locations.REGINA.id)} onDragLeave={handleDragLeave}
+                        isOver={draggingOverBucket === locations.REGINA.id}
+                        projectCount={getProjectCountForLocation(locations.REGINA.id)}
+                    />
+                    <LocationBucket 
+                        locationDetails={locations.SASKATOON} 
+                        onDrop={handleDrop} onDragOver={(e) => handleDragOver(e, locations.SASKATOON.id)} onDragLeave={handleDragLeave}
+                        isOver={draggingOverBucket === locations.SASKATOON.id}
+                        projectCount={getProjectCountForLocation(locations.SASKATOON.id)}
+                    />
+                </div>
+            </Card>
+        </div>
+    );
+};
+
+// --- Display Page Components ---
+const ProjectGridCell = ({ project, locationMap }) => {
+    const locationDetails = Object.values(locationMap).find(loc => loc.id === project.location);
+    const tileBgColor = locationDetails ? locationDetails.tileColor : 'bg-gray-100/80 border-gray-400';
+
+    return (
+        <div className={`aspect-square shadow-lg rounded-lg flex flex-col items-center justify-center p-1.5 sm:p-2 text-center border ${tileBgColor} hover:shadow-xl transition-shadow`}>
+            {isIconUrl(project.projectIcon) ? (
+                <img 
+                    src={project.projectIcon} 
+                    alt={project.projectName} 
+                    className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-32 lg:h-32 object-contain"
+                    onError={(e) => { e.target.style.display='none'; const fallback = e.target.nextElementSibling; if (fallback && fallback.classList.contains('fallback-icon-text')) { fallback.style.display='block';}}}
+                />
+            ) : (
+                <span className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl">{project.projectIcon}</span>
+            )}
+            <span className="mt-1 text-[10px] sm:text-xs font-semibold text-gray-800">{project.salespersonInitials}</span>
+            {locationDetails && <span className="text-[9px] sm:text-[10px] text-gray-600">{locationDetails.name.substring(0,3).toUpperCase()}</span>}
+        </div>
+    );
+};
+
+const DisplayPage = () => {
+    const { loggedProjects, monthlyGoal, setCurrentPage, resetMonthlyData, isLoading, locations } = useContext(AppContext);
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const projectsToDisplay = loggedProjects.slice(0, monthlyGoal); 
+    const emptyCellsCount = Math.max(0, monthlyGoal - projectsToDisplay.length);
+    
+    const numColumns = Math.min(6, Math.max(3, Math.ceil(Math.sqrt(monthlyGoal * 0.8))));
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 sm:p-6 md:p-8 flex flex-col items-center justify-center">
+            <div className="w-full max-w-[2100px] h-full flex flex-col">
+                <header className="w-full mb-4 md:mb-6 text-center py-2">
+                     <div className="flex justify-between items-center mb-3 sm:mb-4">
+                        <img src="https://placehold.co/200x70/ffffff/333333?text=YourLogo&font=roboto" alt="Company Logo" className="h-12 sm:h-16 rounded" onError={(e) => e.target.src='https://placehold.co/200x70/CCCCCC/FFFFFF?text=Logo_Err'}/>
+                        <div className="text-right">
+                            <p className="text-lg sm:text-xl md:text-2xl font-medium text-gray-300">{currentTime.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+                            <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-100">{currentTime.toLocaleTimeString()}</p>
+                        </div>
+                    </div>
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-teal-400 to-green-400 leading-tight">
+                        Project Achievements
+                    </h1>
+                    <p className="mt-2 text-3xl sm:text-4xl md:text-5xl font-bold text-yellow-400">
+                        {loggedProjects.length} <span className="text-2xl sm:text-3xl text-gray-300">of</span> {monthlyGoal} <span className="text-2xl sm:text-3xl text-gray-300">Done!</span>
+                    </p>
+                     {loggedProjects.length >= monthlyGoal && (
+                        <p className="mt-1 text-2xl sm:text-3xl text-green-400 animate-pulse">🎉 Goal Achieved! 🎉</p>
+                    )}
+                </header>
+
+                <main className="w-full flex-grow flex items-center justify-center">
+                    {isLoading && <LoadingSpinner message="Loading Projects..." />}
+                    {!isLoading && (
+                        <div className={`grid gap-2 sm:gap-3 md:gap-4 w-full`} style={{gridTemplateColumns: `repeat(${numColumns}, minmax(0, 1fr))`}}>
+                            {projectsToDisplay.map(proj => (
+                                <ProjectGridCell key={proj.id} project={proj} locationMap={locations} />
+                            ))}
+                            {Array.from({ length: emptyCellsCount }).map((_, idx) => (
+                                <div key={`empty_${idx}`} className="aspect-square bg-slate-800/70 rounded-lg opacity-60"></div>
+                            ))}
+                        </div>
+                    )}
+                    { !isLoading && loggedProjects.length === 0 && emptyCellsCount === monthlyGoal && (
+                        <div className="text-center py-10">
+                            <p className="text-3xl text-gray-400">No projects logged yet.</p>
+                        </div>
+                    )}
+                </main>
+                
+                <footer className="w-full mt-4 md:mt-8 text-center py-2">
+                    <Button onClick={() => setCurrentPage('input')} variant="secondary" className="mr-4 text-sm sm:text-base" disabled={isLoading}>
+                        Input Page
+                    </Button>
+                     <Button onClick={resetMonthlyData} variant="danger" className="text-sm sm:text-base" disabled={isLoading}>
+                        Admin: Reset Data
+                    </Button>
+                </footer>
+            </div>
+        </div>
+    );
+};
+
+// --- Main App Component ---
+function App() {
+    const { currentPage, setCurrentPage: contextSetCurrentPage } = useContext(AppContext);
+
+    useEffect(() => {
+        const handleHashChange = () => {
+            const hash = window.location.hash;
+            if (contextSetCurrentPage) {
+                 if (hash === '#/display') contextSetCurrentPage('display');
+                 else if (hash === '#/input' || hash === '') contextSetCurrentPage('input');
+            }
+        };
+        window.addEventListener('hashchange', handleHashChange, false);
+        handleHashChange(); 
+        return () => window.removeEventListener('hashchange', handleHashChange, false);
+    }, [contextSetCurrentPage]);
+
+    return (
+        <div className="min-h-screen bg-gray-100 font-sans">
+            {currentPage === 'input' ? <InputPage /> : <DisplayPage />}
+        </div>
+    );
+}
+
+export default function ProvidedApp() {
+  return (
+    <AppProvider>
+      <App />
+    </AppProvider>
+  );
+}
