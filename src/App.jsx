@@ -501,7 +501,7 @@ const ProjectGridCell = ({ project, locationMap }) => {
                 )}
             </div>
             <div className="w-full text-center mt-auto pt-0.5">
-                <p className="text-sm sm:text-lg font-semibold text-gray-800 truncate px-1">Escape Artist: {project.salespersonName}</p>
+                <p className="text-sm sm:text-lg font-semibold text-gray-800 truncate px-1">{project.salespersonName}</p>
                 {locationDetails && <p className="text-xs sm:text-base text-gray-700">{locationDetails.abbreviation}</p>}
             </div>
         </div>
