@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { db } from './firebase'; // Make sure firebase.js is in the src folder
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore"; 
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDoc, getDocs, writeBatch, setDoc } from "firebase/firestore"; // Added setDoc for settings
 
 // Tailwind CSS is assumed to be available globally.
 
@@ -28,20 +28,20 @@ const PROJECT_TYPES = [
     { id: 'turf', name: 'Turf', icon: 'turf.png' },
 ];
 
-const WEEKLY_GOAL = 60; 
+const DEFAULT_WEEKLY_GOAL = 60; // Default if not found in DB
 
 const PROJECTS_COLLECTION = 'projects';
 const WEEKLY_RECORDS_COLLECTION = 'weeklyRecords'; 
+const APP_SETTINGS_COLLECTION = 'appSettings'; // For storing settings like weekly target
+const GOALS_DOCUMENT_ID = 'goals'; // Document ID for weekly target
 
-const LOCATIONS = { // This is the global constant
+const LOCATIONS = { 
     REGINA: { id: 'regina', name: 'Regina', abbreviation: 'RGNA', tileColor: 'bg-blue-100/80 border-blue-400', bucketColor: 'border-blue-400 bg-blue-50 hover:bg-blue-100', textColor: 'text-blue-700', bucketOverColor: 'border-blue-600 bg-blue-100 scale-105' },
     SASKATOON: { id: 'saskatoon', name: 'Saskatoon', abbreviation: 'SKTN', tileColor: 'bg-green-100/80 border-green-400', bucketColor: 'border-green-400 bg-green-50 hover:bg-green-100', textColor: 'text-green-700', bucketOverColor: 'border-green-600 bg-green-100 scale-105' }
 };
 
-// Helper function to check if the icon string is a URL or a local path
 const isIconUrl = (iconString) => typeof iconString === 'string' && (iconString.startsWith('http') || iconString.startsWith('/') || iconString.includes('.'));
 
-// --- Date Helper Functions ---
 const formatDate = (date, options = { month: 'short', day: 'numeric' }) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString(undefined, options);
@@ -60,15 +60,16 @@ const getWeekStartDate = (sundayEndDate) => {
     return startDate;
 };
 
-// --- Context for Application State ---
 const AppContext = createContext();
 
 const AppProvider = ({ children }) => {
     const [loggedProjects, setLoggedProjects] = useState([]);
     const [weeklyRecords, setWeeklyRecords] = useState([]); 
+    const [currentWeeklyGoal, setCurrentWeeklyGoal] = useState(DEFAULT_WEEKLY_GOAL); // State for dynamic weekly goal
     const [currentPage, setCurrentPage] = useState('input');
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessingWeek, setIsProcessingWeek] = useState(false); 
+    const [isUpdatingTarget, setIsUpdatingTarget] = useState(false);
 
     useEffect(() => {
         const getInitialPage = () => {
@@ -81,32 +82,82 @@ const AppProvider = ({ children }) => {
         setCurrentPage(getInitialPage());
     }, []);
 
+    // Fetch and subscribe to weekly target from Firebase
     useEffect(() => {
-        setIsLoading(true);
+        const goalDocRef = doc(db, APP_SETTINGS_COLLECTION, GOALS_DOCUMENT_ID);
+        const unsubscribeGoal = onSnapshot(goalDocRef, async (docSnap) => {
+            if (docSnap.exists()) {
+                setCurrentWeeklyGoal(docSnap.data().currentWeeklyTarget || DEFAULT_WEEKLY_GOAL);
+            } else {
+                // If doc doesn't exist, create it with default
+                try {
+                    await setDoc(goalDocRef, { currentWeeklyTarget: DEFAULT_WEEKLY_GOAL });
+                    setCurrentWeeklyGoal(DEFAULT_WEEKLY_GOAL);
+                    console.log("Goals document created with default target.");
+                } catch (error) {
+                    console.error("Error creating goals document: ", error);
+                }
+            }
+        }, (error) => {
+            console.error("Error fetching weekly goal: ", error);
+            // Fallback to default if there's an error
+            setCurrentWeeklyGoal(DEFAULT_WEEKLY_GOAL);
+        });
+        return () => unsubscribeGoal();
+    }, []);
+
+    useEffect(() => {
+        setIsLoading(true); // Set loading true at the start of data fetching
         const projectsQuery = query(collection(db, PROJECTS_COLLECTION), orderBy('timestamp', 'desc'));
         const recordsQuery = query(collection(db, WEEKLY_RECORDS_COLLECTION), orderBy('weekEndDate', 'desc'));
+
+        let projectsLoaded = false;
+        let recordsLoaded = false;
+        
+        const checkAllLoaded = () => {
+            if (projectsLoaded && recordsLoaded) {
+                setIsLoading(false);
+            }
+        };
 
         const unsubscribeProjects = onSnapshot(projectsQuery, (querySnapshot) => {
             const projectsData = querySnapshot.docs.map(pDoc => ({ ...pDoc.data(), id: pDoc.id }));
             setLoggedProjects(projectsData);
             handleAutoSundayReset(projectsData); 
+            projectsLoaded = true;
+            checkAllLoaded();
         }, (error) => {
             console.error("Error fetching projects: ", error);
             alert("Could not fetch project data.");
+            projectsLoaded = true; // Still mark as loaded to avoid indefinite loading state
+            checkAllLoaded();
         });
 
         const unsubscribeRecords = onSnapshot(recordsQuery, (querySnapshot) => {
             const recordsData = querySnapshot.docs.map(rDoc => ({ ...rDoc.data(), id: rDoc.id }));
             setWeeklyRecords(recordsData);
+            recordsLoaded = true;
+            checkAllLoaded();
         }, (error) => {
             console.error("Error fetching weekly records: ", error);
             alert("Could not fetch weekly records.");
+            recordsLoaded = true;
+            checkAllLoaded();
         });
         
-        Promise.all([
-            getDocs(projectsQuery), 
-            getDocs(recordsQuery)
-        ]).finally(() => setIsLoading(false));
+        // Initial fetch to help determine loading state faster if snapshots are slow
+        Promise.all([getDocs(projectsQuery), getDocs(recordsQuery)])
+            .then(() => {
+                projectsLoaded = true;
+                recordsLoaded = true;
+                checkAllLoaded();
+            })
+            .catch(() => { // Handle potential errors from initial getDocs
+                projectsLoaded = true;
+                recordsLoaded = true;
+                checkAllLoaded();
+            });
+
 
         return () => {
             unsubscribeProjects();
@@ -122,6 +173,7 @@ const AppProvider = ({ children }) => {
     };
 
     const addProjectToFirebase = async (salespersonId, projectTypeId, locationId) => {
+        // ... (same as before)
         const salesperson = SALESPERSONS.find(s => s.id === salespersonId);
         const projectType = PROJECT_TYPES.find(p => p.id === projectTypeId);
         const locationDetails = LOCATIONS[locationId.toUpperCase()]; 
@@ -149,7 +201,29 @@ const AppProvider = ({ children }) => {
         }
     };
 
+    const updateWeeklyTargetInDB = async (newTarget) => {
+        if (isNaN(newTarget) || newTarget <= 0) {
+            alert("Please enter a valid positive number for the target.");
+            return false;
+        }
+        setIsUpdatingTarget(true);
+        const goalDocRef = doc(db, APP_SETTINGS_COLLECTION, GOALS_DOCUMENT_ID);
+        try {
+            await setDoc(goalDocRef, { currentWeeklyTarget: Number(newTarget) }, { merge: true });
+            // setCurrentWeeklyGoal will be updated by the onSnapshot listener
+            alert("Weekly target updated successfully!");
+            return true;
+        } catch (error) {
+            console.error("Error updating weekly target: ", error);
+            alert("Failed to update weekly target.");
+            return false;
+        } finally {
+            setIsUpdatingTarget(false);
+        }
+    };
+
     const deleteAllProjectsFromBoard = async () => {
+        // ... (same as before)
         const projectsQuerySnapshot = await getDocs(collection(db, PROJECTS_COLLECTION));
         if (projectsQuerySnapshot.empty) return;
         const batch = writeBatch(db);
@@ -159,7 +233,8 @@ const AppProvider = ({ children }) => {
         await batch.commit();
     };
     
-    const logWeekAndResetBoard = async (isAuto = false) => {
+    const logWeekAndResetBoard = async (isAuto = false, projectsForLog = loggedProjects) => {
+        // ... (same as before, but uses currentWeeklyGoal from state)
         if (!isAuto && !window.confirm("This will log the current week's project count, save it, and then clear the display board. Are you sure?")) {
             return;
         }
@@ -169,13 +244,40 @@ const AppProvider = ({ children }) => {
             const weekEnd = getWeekEndDate(today); 
             const weekStart = getWeekStartDate(weekEnd);
             const weekDisplay = `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
-            const completed = loggedProjects.length; 
+            const completed = projectsForLog.length; 
+
+            let topSalespersonName = "N/A";
+            let topSalespersonProjects = 0;
+
+            if (projectsForLog.length > 0) {
+                const salesCounts = projectsForLog.reduce((acc, project) => {
+                    acc[project.salespersonId] = (acc[project.salespersonId] || 0) + 1;
+                    return acc;
+                }, {});
+                let maxProjects = 0;
+                let topSpId = null;
+                for (const spId in salesCounts) {
+                    if (salesCounts[spId] > maxProjects) {
+                        maxProjects = salesCounts[spId];
+                        topSpId = spId;
+                    }
+                }
+                if (topSpId) {
+                    const topSp = SALESPERSONS.find(s => s.id === topSpId);
+                    if (topSp) {
+                        topSalespersonName = topSp.name;
+                        topSalespersonProjects = maxProjects;
+                    }
+                }
+            }
 
             const newRecord = {
                 weekDisplay,
                 completed,
-                target: WEEKLY_GOAL,
+                target: currentWeeklyGoal, // Use dynamic target from state
                 weekEndDate: weekEnd.toISOString(), 
+                topSalespersonName, 
+                topSalespersonProjects, 
                 loggedAt: serverTimestamp()
             };
 
@@ -194,6 +296,7 @@ const AppProvider = ({ children }) => {
     };
 
     const handleAutoSundayReset = async (currentProjects) => {
+        // ... (same as before, passes currentProjects to logWeekAndResetBoard)
         const today = new Date();
         if (today.getDay() === 0) { 
             const todayISO = today.toISOString().split('T')[0]; 
@@ -202,7 +305,7 @@ const AppProvider = ({ children }) => {
             if (lastAutoResetSunday !== todayISO) {
                 if (currentProjects && currentProjects.length > 0) { 
                     console.log("Attempting automatic Sunday log and reset...");
-                    await logWeekAndResetBoard(true); 
+                    await logWeekAndResetBoard(true, currentProjects); 
                     localStorage.setItem('lastAutoResetSunday', todayISO);
                 } else {
                     localStorage.setItem('lastAutoResetSunday', todayISO);
@@ -219,12 +322,14 @@ const AppProvider = ({ children }) => {
             addProject: addProjectToFirebase, 
             currentPage, 
             setCurrentPage: handleSetCurrentPage, 
-            weeklyGoal: WEEKLY_GOAL, 
+            weeklyGoal: currentWeeklyGoal, // Provide dynamic goal
+            updateWeeklyTarget: updateWeeklyTargetInDB, // Provide update function
             salespersons: SALESPERSONS, 
             projectTypes: PROJECT_TYPES, 
             logWeekAndResetBoard, 
             isLoading, 
-            isProcessingWeek, 
+            isProcessingWeek,
+            isUpdatingTarget, 
             locationsData: LOCATIONS 
         }}>
             {children}
@@ -263,7 +368,7 @@ const LoadingSpinner = ({ message = "Loading..."}) => (
     </div>
 );
 
-const createConfettiPiece = () => {
+const createConfettiPiece = () => { /* ... same as before ... */ 
     const piece = document.createElement('div');
     piece.style.position = 'fixed';
     piece.style.left = `${Math.random() * 100}vw`;
@@ -278,8 +383,7 @@ const createConfettiPiece = () => {
     document.body.appendChild(piece);
     return piece;
 };
-
-const animateConfettiPiece = (piece) => {
+const animateConfettiPiece = (piece) => { /* ... same as before ... */
     const fallDuration = Math.random() * 3 + 2.5; 
     const swayAmount = Math.random() * 200 - 100; 
     const rotation = Math.random() * 720 + 360; 
@@ -293,13 +397,13 @@ const animateConfettiPiece = (piece) => {
     });
     setTimeout(() => { if (piece.parentNode) piece.parentNode.removeChild(piece); }, fallDuration * 1000);
 };
-const triggerConfetti = (count = 150) => {
+const triggerConfetti = (count = 150) => { /* ... same as before ... */
     for (let i = 0; i < count; i++) {
         setTimeout(() => { const piece = createConfettiPiece(); animateConfettiPiece(piece); }, i * 15);
     }
 };
 
-const ProjectIcon = ({ project, onDragStart }) => (
+const ProjectIcon = ({ project, onDragStart }) => ( /* ... same as before ... */ 
     <div draggable onDragStart={(e) => onDragStart(e, project.id)}
         className="flex flex-col items-center justify-center p-1 sm:p-2 m-1 border-2 border-dashed border-gray-300 rounded-lg cursor-grab hover:bg-gray-100 transition-colors aspect-square"
         title={project.name}>
@@ -316,7 +420,7 @@ const ProjectIcon = ({ project, onDragStart }) => (
     </div>
 );
 
-const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOver, projectCount }) => (
+const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOver, projectCount }) => ( /* ... same as before ... */ 
     <div onDrop={(e) => onDrop(e, locationDetails.id)} onDragOver={onDragOver} onDragLeave={onDragLeave}
         className={`mt-6 p-6 md:p-8 border-4 border-dashed rounded-xl text-center transition-all duration-200 ease-in-out min-h-[150px] flex flex-col justify-center items-center
                   ${isOver ? locationDetails.bucketOverColor : locationDetails.bucketColor}`}>
@@ -330,25 +434,46 @@ const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOv
 );
 
 const WeeklyLogDisplay = () => {
-    const { weeklyRecords, isLoading, logWeekAndResetBoard, isProcessingWeek } = useContext(AppContext); 
+    const { weeklyRecords, isLoading, logWeekAndResetBoard, isProcessingWeek, weeklyGoal, updateWeeklyTarget, isUpdatingTarget } = useContext(AppContext); 
+    const [newTargetInput, setNewTargetInput] = useState(weeklyGoal.toString());
+
+    useEffect(() => {
+        setNewTargetInput(weeklyGoal.toString());
+    }, [weeklyGoal]);
+
+    const handleTargetSubmit = async (e) => {
+        e.preventDefault();
+        const targetValue = parseInt(newTargetInput, 10);
+        if (!isNaN(targetValue) && targetValue > 0) {
+            await updateWeeklyTarget(targetValue);
+        } else {
+            alert("Please enter a valid positive number for the target.");
+        }
+    };
 
     if (isLoading && weeklyRecords.length === 0) { 
         return <LoadingSpinner message="Loading weekly records..." />;
     }
 
     return (
-        <Card className="bg-gray-50 h-full flex flex-col"> {/* Added flex flex-col for button placement */}
+        <Card className="bg-gray-50 h-full flex flex-col">
             <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Weekly Performance</h2>
             {weeklyRecords.length > 0 ? (
-                <ul className="space-y-2 max-h-80 overflow-y-auto pr-2 flex-grow"> {/* flex-grow to take available space */}
+                <ul className="space-y-2 max-h-64 overflow-y-auto pr-2 flex-grow mb-4"> {/* Adjusted max-h */}
                     {weeklyRecords.map(record => (
                         <li key={record.id} className={`p-3 rounded-lg shadow text-gray-700 ${record.completed >= record.target ? 'bg-green-100 border-green-400' : 'bg-red-100 border-red-400'}`}>
-                            <div className="flex justify-between items-center">
+                            <div className="flex justify-between items-center mb-1">
                                 <span className="font-medium text-md">{record.weekDisplay}</span>
                                 <span className={`font-bold text-lg ${record.completed >= record.target ? 'text-green-600' : 'text-red-600'}`}>
                                     {record.completed}/{record.target}
                                 </span>
                             </div>
+                             {/* Display Top Salesperson Info */}
+                            {record.topSalespersonName && record.topSalespersonName !== "N/A" && (
+                                <p className="text-xs text-gray-600">
+                                    Top: {record.topSalespersonName} ({record.topSalespersonProjects})
+                                </p>
+                            )}
                             <p className="text-xs text-gray-500 mt-0.5">
                                 {record.completed >= record.target ? `Goal Met! 🎉 (+${record.completed - record.target})` : `Short by ${record.target - record.completed}`}
                             </p>
@@ -356,18 +481,34 @@ const WeeklyLogDisplay = () => {
                     ))}
                 </ul>
             ) : (
-                <p className="text-gray-600 text-center py-4 flex-grow flex items-center justify-center">No weekly records yet.</p> // flex-grow to center if no records
+                <p className="text-gray-600 text-center py-4 flex-grow flex items-center justify-center">No weekly records yet.</p>
             )}
-            <div className="mt-auto pt-4 text-center"> {/* mt-auto pushes button to bottom */}
-                 <Button onClick={() => logWeekAndResetBoard(false)} variant="danger" className="w-full sm:w-auto" disabled={isLoading || isProcessingWeek}>
+            {/* Weekly Target Input */}
+            <form onSubmit={handleTargetSubmit} className="mt-auto pt-4 border-t border-gray-200">
+                <label htmlFor="weeklyTargetInput" className="block text-sm font-medium text-gray-700 mb-1">Set Weekly Target:</label>
+                <div className="flex items-center gap-2 mb-3">
+                    <input 
+                        type="number" 
+                        id="weeklyTargetInput"
+                        value={newTargetInput}
+                        onChange={(e) => setNewTargetInput(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 text-md"
+                        disabled={isUpdatingTarget || isLoading}
+                        min="1"
+                    />
+                    <Button type="submit" variant="secondary" className="py-2 px-4 text-sm" disabled={isUpdatingTarget || isLoading}>
+                        {isUpdatingTarget ? "Saving..." : "Set"}
+                    </Button>
+                </div>
+                <Button onClick={() => logWeekAndResetBoard(false)} variant="danger" className="w-full" disabled={isLoading || isProcessingWeek}>
                     {isProcessingWeek ? 'Processing...' : 'Finalize Week & Reset Board'}
                 </Button>
-            </div>
+            </form>
         </Card>
     );
 };
 
-const InputPage = () => {
+const InputPage = () => { /* ... same InputPage structure as before, WeeklyLogDisplay will now include the button and input */ 
     const { 
         addProject, salespersons, projectTypes, setCurrentPage, isLoading, 
         isProcessingWeek, locationsData: locations, loggedProjects
@@ -418,7 +559,7 @@ const InputPage = () => {
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-6 max-w-screen-xl"> {/* Adjusted max-width */}
+        <div className="container mx-auto p-4 md:p-6 max-w-screen-xl"> 
             {congratsData.show && ( 
                 <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10000] p-4">
                     <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl text-center max-w-md w-full">
@@ -430,7 +571,6 @@ const InputPage = () => {
                 </div>
             )}
             
-            {/* Top Row: Log New Project Card */}
             <div className="mb-6 lg:mb-8">
                 <Card> 
                     <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
@@ -459,16 +599,15 @@ const InputPage = () => {
                 </Card>
             </div>
 
-            {/* Second Row: Weekly Log and Leaderboard */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-                <div> {/* Column for Weekly Log & Reset Button */}
+                <div> 
                     <WeeklyLogDisplay />
                 </div>
-                <div> {/* Column for Leaderboard */}
+                <div> 
                     <Card className="bg-gray-50 h-full"> 
                         <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Salesperson Leaderboard</h2>
                         {isLoading && salespersonStats.length === 0 ? <LoadingSpinner message="Loading leaderboard..." /> : salespersonStats.length > 0 ? (
-                            <ul className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2"> {/* Adjust max-h if needed */}
+                            <ul className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2"> 
                                 {salespersonStats.map((sp, index) => (
                                     <li key={sp.id} className={`p-3 rounded-lg shadow flex justify-between items-center text-gray-700 ${index === 0 ? 'bg-yellow-100 border-yellow-400' : index === 1 ? 'bg-gray-200 border-gray-400' : index === 2 ? 'bg-orange-100 border-orange-400' : 'bg-white border-gray-300'}`}>
                                         <span className="font-medium text-lg">{index + 1}. {sp.name} {index === 0 && '🥇'} {index === 1 && '🥈'} {index === 2 && '🥉'}</span>
@@ -484,7 +623,7 @@ const InputPage = () => {
     );
 };
 
-const ProjectGridCell = ({ project, locationMap }) => {
+const ProjectGridCell = ({ project, locationMap }) => { /* ... same as before ... */ 
     const safeLocationMap = locationMap || {};
     const locationDetails = Object.values(safeLocationMap).find(loc => loc.id === project.location);
     const tileBgColor = locationDetails ? locationDetails.tileColor : 'bg-gray-100/80 border-gray-400';
@@ -507,8 +646,7 @@ const ProjectGridCell = ({ project, locationMap }) => {
         </div>
     );
 };
-
-const DisplayPage = () => {
+const DisplayPage = () => { /* ... same as before ... */ 
     const { 
         loggedProjects, weeklyGoal, setCurrentPage, isLoading, 
         isProcessingWeek, locationsData: locations 
@@ -525,7 +663,7 @@ const DisplayPage = () => {
     const projectsToDisplay = loggedProjects.slice(0, weeklyGoal); 
     const emptyCellsCount = Math.max(0, weeklyGoal - projectsToDisplay.length);
     
-    const numColumns = 6; // DisplayPage uses 6 columns
+    const numColumns = 6; 
 
     if (!locations) { 
         return <LoadingSpinner message="Initializing display data..." />;
@@ -585,8 +723,7 @@ const DisplayPage = () => {
         </div>
     );
 };
-
-function App() {
+function App() { /* ... same as before ... */ 
     const appContextValue = useContext(AppContext); 
     if (!appContextValue) {
         return <LoadingSpinner message="Initializing Application..." />; 
@@ -612,8 +749,7 @@ function App() {
         </div>
     );
 }
-
-export default function ProvidedApp() {
+export default function ProvidedApp() { /* ... same as before ... */ 
   return (
     <AppProvider>
       <App />
