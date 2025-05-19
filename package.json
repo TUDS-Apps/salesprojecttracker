@@ -13,7 +13,7 @@
     "firebase": "^10.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
-    "lucide-react": "^0.300.0", // Use the latest or your desired version
+    "lucide-react": "^0.300.0",
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
