@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { db } from './firebase'; // Make sure firebase.js is in the src folder
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDoc, getDocs, writeBatch, setDoc, updateDoc } from "firebase/firestore"; // Added updateDoc
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDoc, getDocs, writeBatch, setDoc, updateDoc } from "firebase/firestore"; 
+import { Edit3 } from 'lucide-react'; // Import the pencil icon
 
 // Tailwind CSS is assumed to be available globally.
 
@@ -70,7 +71,7 @@ const AppProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessingWeek, setIsProcessingWeek] = useState(false); 
     const [isUpdatingTarget, setIsUpdatingTarget] = useState(false);
-    const [isUpdatingRecord, setIsUpdatingRecord] = useState(false); // For loading state of record update
+    const [isUpdatingRecord, setIsUpdatingRecord] = useState(false); 
 
     useEffect(() => {
         const getInitialPage = () => {
@@ -133,12 +134,12 @@ const AppProvider = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); 
 
-    const handleSetCurrentPage = (page) => { /* ... same ... */ 
+    const handleSetCurrentPage = (page) => { 
         setCurrentPage(page);
         localStorage.setItem('salesTrackerCurrentPage', page);
         window.location.hash = page === 'display' ? '#/display' : '#/input';
     };
-    const addProjectToFirebase = async (salespersonId, projectTypeId, locationId) => { /* ... same ... */ 
+    const addProjectToFirebase = async (salespersonId, projectTypeId, locationId) => { 
         const salesperson = SALESPERSONS.find(s => s.id === salespersonId);
         const projectType = PROJECT_TYPES.find(p => p.id === projectTypeId);
         const locationDetails = LOCATIONS[locationId.toUpperCase()]; 
@@ -165,7 +166,7 @@ const AppProvider = ({ children }) => {
             return false;
         }
     };
-    const updateWeeklyTargetInDB = async (newTarget) => { /* ... same ... */ 
+    const updateWeeklyTargetInDB = async (newTarget) => { 
         if (isNaN(newTarget) || newTarget <= 0) {
             alert("Please enter a valid positive number for the target.");
             return false;
@@ -184,7 +185,7 @@ const AppProvider = ({ children }) => {
             setIsUpdatingTarget(false);
         }
     };
-    const deleteAllProjectsFromBoard = async () => { /* ... same ... */ 
+    const deleteAllProjectsFromBoard = async () => { 
         const projectsQuerySnapshot = await getDocs(collection(db, PROJECTS_COLLECTION));
         if (projectsQuerySnapshot.empty) return;
         const batch = writeBatch(db);
@@ -194,7 +195,7 @@ const AppProvider = ({ children }) => {
         await batch.commit();
     };
     
-    const logWeekAndResetBoard = async (isAuto = false, projectsForLog = loggedProjects) => { /* ... same ... */ 
+    const logWeekAndResetBoard = async (isAuto = false, projectsForLog = loggedProjects) => { 
         if (!isAuto && !window.confirm("This will log the current week's project count, save it, and then clear the display board. Are you sure?")) {
             return;
         }
@@ -275,7 +276,7 @@ const AppProvider = ({ children }) => {
         }
     };
 
-    const handleAutoSundayReset = async (currentProjects) => { /* ... same ... */ 
+    const handleAutoSundayReset = async (currentProjects) => { 
         const today = new Date();
         if (today.getDay() === 0) { 
             const todayISO = today.toISOString().split('T')[0]; 
@@ -300,8 +301,8 @@ const AppProvider = ({ children }) => {
             setCurrentPage: handleSetCurrentPage, weeklyGoal: currentWeeklyGoal, 
             updateWeeklyTarget: updateWeeklyTargetInDB, 
             salespersons: SALESPERSONS, projectTypes: PROJECT_TYPES, 
-            logWeekAndResetBoard, updateWeeklyRecord: updateWeeklyRecordInDB, // Pass new update function
-            isLoading, isProcessingWeek, isUpdatingTarget, isUpdatingRecord, // Pass new loading state
+            logWeekAndResetBoard, updateWeeklyRecord: updateWeeklyRecordInDB, 
+            isLoading, isProcessingWeek, isUpdatingTarget, isUpdatingRecord, 
             locationsData: LOCATIONS 
         }}>
             {children}
@@ -310,22 +311,22 @@ const AppProvider = ({ children }) => {
 };
 
 // --- UI Components ---
-const Card = ({ children, className = '' }) => ( /* ... same ... */ 
+const Card = ({ children, className = '' }) => ( 
     <div className={`bg-white shadow-xl rounded-lg p-6 md:p-8 ${className}`}>
         {children}
     </div>
 );
-const Button = ({ children, onClick, className = '', variant = 'primary', disabled = false }) => ( /* ... same ... */ 
+const Button = ({ children, onClick, className = '', variant = 'primary', disabled = false }) => ( 
     <button onClick={onClick} disabled={disabled}
         className={`px-6 py-3 rounded-lg font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-opacity-75 transition-all ${
             variant === 'primary' ? 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500' :
             variant === 'secondary' ? 'bg-gray-200 hover:bg-gray-300 text-gray-800 focus:ring-gray-400' :
-            'bg-red-500 hover:bg-red-600 text-white focus:ring-red-400' // Default to danger or add more variants
+            'bg-red-500 hover:bg-red-600 text-white focus:ring-red-400' 
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
         {children}
     </button>
 );
-const LoadingSpinner = ({ message = "Loading..."}) => ( /* ... same ... */ 
+const LoadingSpinner = ({ message = "Loading..."}) => ( 
     <div className="flex flex-col items-center justify-center p-10 text-gray-700">
         <svg className="animate-spin h-10 w-10 text-blue-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
@@ -334,7 +335,7 @@ const LoadingSpinner = ({ message = "Loading..."}) => ( /* ... same ... */
         <p className="text-lg">{message}</p>
     </div>
 );
-const createConfettiPiece = () => { /* ... same as before ... */ 
+const createConfettiPiece = () => { 
     const piece = document.createElement('div');
     piece.style.position = 'fixed';
     piece.style.left = `${Math.random() * 100}vw`;
@@ -349,7 +350,7 @@ const createConfettiPiece = () => { /* ... same as before ... */
     document.body.appendChild(piece);
     return piece;
 };
-const animateConfettiPiece = (piece) => { /* ... same as before ... */
+const animateConfettiPiece = (piece) => {
     const fallDuration = Math.random() * 3 + 2.5; 
     const swayAmount = Math.random() * 200 - 100; 
     const rotation = Math.random() * 720 + 360; 
@@ -363,12 +364,12 @@ const animateConfettiPiece = (piece) => { /* ... same as before ... */
     });
     setTimeout(() => { if (piece.parentNode) piece.parentNode.removeChild(piece); }, fallDuration * 1000);
 };
-const triggerConfetti = (count = 150) => { /* ... same as before ... */
+const triggerConfetti = (count = 150) => {
     for (let i = 0; i < count; i++) {
         setTimeout(() => { const piece = createConfettiPiece(); animateConfettiPiece(piece); }, i * 15);
     }
 };
-const ProjectIcon = ({ project, onDragStart }) => ( /* ... same as before ... */ 
+const ProjectIcon = ({ project, onDragStart }) => ( 
     <div draggable onDragStart={(e) => onDragStart(e, project.id)}
         className="flex flex-col items-center justify-center p-1 sm:p-2 m-1 border-2 border-dashed border-gray-300 rounded-lg cursor-grab hover:bg-gray-100 transition-colors aspect-square"
         title={project.name}>
@@ -384,7 +385,7 @@ const ProjectIcon = ({ project, onDragStart }) => ( /* ... same as before ... */
         )}
     </div>
 );
-const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOver, projectCount }) => ( /* ... same as before ... */ 
+const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOver, projectCount }) => ( 
     <div onDrop={(e) => onDrop(e, locationDetails.id)} onDragOver={onDragOver} onDragLeave={onDragLeave}
         className={`mt-6 p-6 md:p-8 border-4 border-dashed rounded-xl text-center transition-all duration-200 ease-in-out min-h-[150px] flex flex-col justify-center items-center
                   ${isOver ? locationDetails.bucketOverColor : locationDetails.bucketColor}`}>
@@ -423,7 +424,7 @@ const WeeklyLogDisplay = () => {
             completed: record.completed.toString(),
             topSalespersonName: record.topSalespersonName || '',
             topSalespersonProjects: record.topSalespersonProjects?.toString() || '0',
-            target: record.target.toString() // Keep original target for display, not editable here
+            target: record.target.toString() 
         });
     };
 
@@ -486,23 +487,32 @@ const WeeklyLogDisplay = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="font-medium text-md">{record.weekDisplay}</span>
-                                        <span className={`font-bold text-lg ${record.completed >= record.target ? 'text-green-600' : 'text-red-600'}`}>
-                                            {record.completed}/{record.target}
-                                        </span>
-                                    </div>
-                                    {record.topSalespersonName && record.topSalespersonName !== "N/A" && (
-                                        <p className="text-xs text-gray-600">
-                                            Top: {record.topSalespersonName} ({record.topSalespersonProjects})
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="font-medium text-md">{record.weekDisplay}</span>
+                                            <span className={`font-bold text-lg ml-2 ${record.completed >= record.target ? 'text-green-600' : 'text-red-600'}`}>
+                                                {record.completed}/{record.target}
+                                            </span>
+                                        </div>
+                                        {record.topSalespersonName && record.topSalespersonName !== "N/A" && (
+                                            <p className="text-xs text-gray-600">
+                                                Top: {record.topSalespersonName} ({record.topSalespersonProjects})
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-gray-500 mt-0.5">
+                                            {record.completed >= record.target ? `Goal Met! 🎉 (+${record.completed - record.target})` : `Short by ${record.target - record.completed}`}
                                         </p>
-                                    )}
-                                    <p className="text-xs text-gray-500 mt-0.5">
-                                        {record.completed >= record.target ? `Goal Met! 🎉 (+${record.completed - record.target})` : `Short by ${record.target - record.completed}`}
-                                    </p>
-                                    <Button onClick={() => handleEditClick(record)} variant="secondary" className="py-1 px-2 text-xs mt-2 float-right" disabled={isUpdatingRecord || isProcessingWeek}>Edit</Button>
-                                </>
+                                    </div>
+                                    <button 
+                                        onClick={() => handleEditClick(record)} 
+                                        className="p-1 text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                                        disabled={isUpdatingRecord || isProcessingWeek}
+                                        title="Edit Log Entry"
+                                    >
+                                        <Edit3 size={16} />
+                                    </button>
+                                </div>
                             )}
                         </li>
                     ))}
@@ -531,7 +541,7 @@ const WeeklyLogDisplay = () => {
     );
 };
 
-const InputPage = () => { /* ... same InputPage structure as before ... */ 
+const InputPage = () => { 
     const { 
         addProject, salespersons, projectTypes, setCurrentPage, isLoading, 
         isProcessingWeek, locationsData: locations, loggedProjects
@@ -646,7 +656,7 @@ const InputPage = () => { /* ... same InputPage structure as before ... */
     );
 };
 
-const ProjectGridCell = ({ project, locationMap }) => { /* ... same as before ... */ 
+const ProjectGridCell = ({ project, locationMap }) => { 
     const safeLocationMap = locationMap || {};
     const locationDetails = Object.values(safeLocationMap).find(loc => loc.id === project.location);
     const tileBgColor = locationDetails ? locationDetails.tileColor : 'bg-gray-100/80 border-gray-400';
@@ -669,7 +679,7 @@ const ProjectGridCell = ({ project, locationMap }) => { /* ... same as before ..
         </div>
     );
 };
-const DisplayPage = () => { /* ... same as before ... */ 
+const DisplayPage = () => { 
     const { 
         loggedProjects, weeklyGoal, setCurrentPage, isLoading, 
         isProcessingWeek, locationsData: locations 
@@ -746,7 +756,7 @@ const DisplayPage = () => { /* ... same as before ... */
         </div>
     );
 };
-function App() { /* ... same as before ... */ 
+function App() { 
     const appContextValue = useContext(AppContext); 
     if (!appContextValue) {
         return <LoadingSpinner message="Initializing Application..." />; 
@@ -772,7 +782,7 @@ function App() { /* ... same as before ... */
         </div>
     );
 }
-export default function ProvidedApp() { /* ... same as before ... */ 
+export default function ProvidedApp() { 
   return (
     <AppProvider>
       <App />
