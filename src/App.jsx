@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { db } from './firebase'; // Make sure firebase.js is in the src folder
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDoc, getDocs, writeBatch, setDoc } from "firebase/firestore"; // Added setDoc for settings
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDoc, getDocs, writeBatch, setDoc, updateDoc } from "firebase/firestore"; // Added updateDoc
 
 // Tailwind CSS is assumed to be available globally.
 
@@ -28,12 +28,12 @@ const PROJECT_TYPES = [
     { id: 'turf', name: 'Turf', icon: 'turf.png' },
 ];
 
-const DEFAULT_WEEKLY_GOAL = 60; // Default if not found in DB
+const DEFAULT_WEEKLY_GOAL = 60; 
 
 const PROJECTS_COLLECTION = 'projects';
 const WEEKLY_RECORDS_COLLECTION = 'weeklyRecords'; 
-const APP_SETTINGS_COLLECTION = 'appSettings'; // For storing settings like weekly target
-const GOALS_DOCUMENT_ID = 'goals'; // Document ID for weekly target
+const APP_SETTINGS_COLLECTION = 'appSettings'; 
+const GOALS_DOCUMENT_ID = 'goals'; 
 
 const LOCATIONS = { 
     REGINA: { id: 'regina', name: 'Regina', abbreviation: 'RGNA', tileColor: 'bg-blue-100/80 border-blue-400', bucketColor: 'border-blue-400 bg-blue-50 hover:bg-blue-100', textColor: 'text-blue-700', bucketOverColor: 'border-blue-600 bg-blue-100 scale-105' },
@@ -65,11 +65,12 @@ const AppContext = createContext();
 const AppProvider = ({ children }) => {
     const [loggedProjects, setLoggedProjects] = useState([]);
     const [weeklyRecords, setWeeklyRecords] = useState([]); 
-    const [currentWeeklyGoal, setCurrentWeeklyGoal] = useState(DEFAULT_WEEKLY_GOAL); // State for dynamic weekly goal
+    const [currentWeeklyGoal, setCurrentWeeklyGoal] = useState(DEFAULT_WEEKLY_GOAL); 
     const [currentPage, setCurrentPage] = useState('input');
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessingWeek, setIsProcessingWeek] = useState(false); 
     const [isUpdatingTarget, setIsUpdatingTarget] = useState(false);
+    const [isUpdatingRecord, setIsUpdatingRecord] = useState(false); // For loading state of record update
 
     useEffect(() => {
         const getInitialPage = () => {
@@ -82,14 +83,12 @@ const AppProvider = ({ children }) => {
         setCurrentPage(getInitialPage());
     }, []);
 
-    // Fetch and subscribe to weekly target from Firebase
     useEffect(() => {
         const goalDocRef = doc(db, APP_SETTINGS_COLLECTION, GOALS_DOCUMENT_ID);
         const unsubscribeGoal = onSnapshot(goalDocRef, async (docSnap) => {
             if (docSnap.exists()) {
                 setCurrentWeeklyGoal(docSnap.data().currentWeeklyTarget || DEFAULT_WEEKLY_GOAL);
             } else {
-                // If doc doesn't exist, create it with default
                 try {
                     await setDoc(goalDocRef, { currentWeeklyTarget: DEFAULT_WEEKLY_GOAL });
                     setCurrentWeeklyGoal(DEFAULT_WEEKLY_GOAL);
@@ -100,80 +99,46 @@ const AppProvider = ({ children }) => {
             }
         }, (error) => {
             console.error("Error fetching weekly goal: ", error);
-            // Fallback to default if there's an error
             setCurrentWeeklyGoal(DEFAULT_WEEKLY_GOAL);
         });
         return () => unsubscribeGoal();
     }, []);
 
     useEffect(() => {
-        setIsLoading(true); // Set loading true at the start of data fetching
+        setIsLoading(true); 
         const projectsQuery = query(collection(db, PROJECTS_COLLECTION), orderBy('timestamp', 'desc'));
         const recordsQuery = query(collection(db, WEEKLY_RECORDS_COLLECTION), orderBy('weekEndDate', 'desc'));
-
         let projectsLoaded = false;
         let recordsLoaded = false;
-        
-        const checkAllLoaded = () => {
-            if (projectsLoaded && recordsLoaded) {
-                setIsLoading(false);
-            }
-        };
+        const checkAllLoaded = () => { if (projectsLoaded && recordsLoaded) setIsLoading(false); };
 
         const unsubscribeProjects = onSnapshot(projectsQuery, (querySnapshot) => {
             const projectsData = querySnapshot.docs.map(pDoc => ({ ...pDoc.data(), id: pDoc.id }));
             setLoggedProjects(projectsData);
             handleAutoSundayReset(projectsData); 
-            projectsLoaded = true;
-            checkAllLoaded();
-        }, (error) => {
-            console.error("Error fetching projects: ", error);
-            alert("Could not fetch project data.");
-            projectsLoaded = true; // Still mark as loaded to avoid indefinite loading state
-            checkAllLoaded();
-        });
+            projectsLoaded = true; checkAllLoaded();
+        }, (error) => { console.error("Error fetching projects: ", error); alert("Could not fetch project data."); projectsLoaded = true; checkAllLoaded(); });
 
         const unsubscribeRecords = onSnapshot(recordsQuery, (querySnapshot) => {
             const recordsData = querySnapshot.docs.map(rDoc => ({ ...rDoc.data(), id: rDoc.id }));
             setWeeklyRecords(recordsData);
-            recordsLoaded = true;
-            checkAllLoaded();
-        }, (error) => {
-            console.error("Error fetching weekly records: ", error);
-            alert("Could not fetch weekly records.");
-            recordsLoaded = true;
-            checkAllLoaded();
-        });
+            recordsLoaded = true; checkAllLoaded();
+        }, (error) => { console.error("Error fetching weekly records: ", error); alert("Could not fetch weekly records."); recordsLoaded = true; checkAllLoaded(); });
         
-        // Initial fetch to help determine loading state faster if snapshots are slow
         Promise.all([getDocs(projectsQuery), getDocs(recordsQuery)])
-            .then(() => {
-                projectsLoaded = true;
-                recordsLoaded = true;
-                checkAllLoaded();
-            })
-            .catch(() => { // Handle potential errors from initial getDocs
-                projectsLoaded = true;
-                recordsLoaded = true;
-                checkAllLoaded();
-            });
+            .then(() => { projectsLoaded = true; recordsLoaded = true; checkAllLoaded(); })
+            .catch(() => { projectsLoaded = true; recordsLoaded = true; checkAllLoaded(); });
 
-
-        return () => {
-            unsubscribeProjects();
-            unsubscribeRecords();
-        };
+        return () => { unsubscribeProjects(); unsubscribeRecords(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); 
 
-    const handleSetCurrentPage = (page) => {
+    const handleSetCurrentPage = (page) => { /* ... same ... */ 
         setCurrentPage(page);
         localStorage.setItem('salesTrackerCurrentPage', page);
         window.location.hash = page === 'display' ? '#/display' : '#/input';
     };
-
-    const addProjectToFirebase = async (salespersonId, projectTypeId, locationId) => {
-        // ... (same as before)
+    const addProjectToFirebase = async (salespersonId, projectTypeId, locationId) => { /* ... same ... */ 
         const salesperson = SALESPERSONS.find(s => s.id === salespersonId);
         const projectType = PROJECT_TYPES.find(p => p.id === projectTypeId);
         const locationDetails = LOCATIONS[locationId.toUpperCase()]; 
@@ -200,8 +165,7 @@ const AppProvider = ({ children }) => {
             return false;
         }
     };
-
-    const updateWeeklyTargetInDB = async (newTarget) => {
+    const updateWeeklyTargetInDB = async (newTarget) => { /* ... same ... */ 
         if (isNaN(newTarget) || newTarget <= 0) {
             alert("Please enter a valid positive number for the target.");
             return false;
@@ -210,7 +174,6 @@ const AppProvider = ({ children }) => {
         const goalDocRef = doc(db, APP_SETTINGS_COLLECTION, GOALS_DOCUMENT_ID);
         try {
             await setDoc(goalDocRef, { currentWeeklyTarget: Number(newTarget) }, { merge: true });
-            // setCurrentWeeklyGoal will be updated by the onSnapshot listener
             alert("Weekly target updated successfully!");
             return true;
         } catch (error) {
@@ -221,9 +184,7 @@ const AppProvider = ({ children }) => {
             setIsUpdatingTarget(false);
         }
     };
-
-    const deleteAllProjectsFromBoard = async () => {
-        // ... (same as before)
+    const deleteAllProjectsFromBoard = async () => { /* ... same ... */ 
         const projectsQuerySnapshot = await getDocs(collection(db, PROJECTS_COLLECTION));
         if (projectsQuerySnapshot.empty) return;
         const batch = writeBatch(db);
@@ -233,8 +194,7 @@ const AppProvider = ({ children }) => {
         await batch.commit();
     };
     
-    const logWeekAndResetBoard = async (isAuto = false, projectsForLog = loggedProjects) => {
-        // ... (same as before, but uses currentWeeklyGoal from state)
+    const logWeekAndResetBoard = async (isAuto = false, projectsForLog = loggedProjects) => { /* ... same ... */ 
         if (!isAuto && !window.confirm("This will log the current week's project count, save it, and then clear the display board. Are you sure?")) {
             return;
         }
@@ -274,7 +234,7 @@ const AppProvider = ({ children }) => {
             const newRecord = {
                 weekDisplay,
                 completed,
-                target: currentWeeklyGoal, // Use dynamic target from state
+                target: currentWeeklyGoal, 
                 weekEndDate: weekEnd.toISOString(), 
                 topSalespersonName, 
                 topSalespersonProjects, 
@@ -295,8 +255,27 @@ const AppProvider = ({ children }) => {
         }
     };
 
-    const handleAutoSundayReset = async (currentProjects) => {
-        // ... (same as before, passes currentProjects to logWeekAndResetBoard)
+    const updateWeeklyRecordInDB = async (recordId, updatedData) => {
+        if (!recordId || !updatedData) {
+            alert("Missing data for update.");
+            return false;
+        }
+        setIsUpdatingRecord(true);
+        const recordDocRef = doc(db, WEEKLY_RECORDS_COLLECTION, recordId);
+        try {
+            await updateDoc(recordDocRef, updatedData);
+            alert("Weekly record updated successfully!");
+            return true;
+        } catch (error) {
+            console.error("Error updating weekly record: ", error);
+            alert("Failed to update weekly record.");
+            return false;
+        } finally {
+            setIsUpdatingRecord(false);
+        }
+    };
+
+    const handleAutoSundayReset = async (currentProjects) => { /* ... same ... */ 
         const today = new Date();
         if (today.getDay() === 0) { 
             const todayISO = today.toISOString().split('T')[0]; 
@@ -317,19 +296,12 @@ const AppProvider = ({ children }) => {
 
     return (
         <AppContext.Provider value={{ 
-            loggedProjects, 
-            weeklyRecords, 
-            addProject: addProjectToFirebase, 
-            currentPage, 
-            setCurrentPage: handleSetCurrentPage, 
-            weeklyGoal: currentWeeklyGoal, // Provide dynamic goal
-            updateWeeklyTarget: updateWeeklyTargetInDB, // Provide update function
-            salespersons: SALESPERSONS, 
-            projectTypes: PROJECT_TYPES, 
-            logWeekAndResetBoard, 
-            isLoading, 
-            isProcessingWeek,
-            isUpdatingTarget, 
+            loggedProjects, weeklyRecords, addProject: addProjectToFirebase, currentPage, 
+            setCurrentPage: handleSetCurrentPage, weeklyGoal: currentWeeklyGoal, 
+            updateWeeklyTarget: updateWeeklyTargetInDB, 
+            salespersons: SALESPERSONS, projectTypes: PROJECT_TYPES, 
+            logWeekAndResetBoard, updateWeeklyRecord: updateWeeklyRecordInDB, // Pass new update function
+            isLoading, isProcessingWeek, isUpdatingTarget, isUpdatingRecord, // Pass new loading state
             locationsData: LOCATIONS 
         }}>
             {children}
@@ -338,27 +310,22 @@ const AppProvider = ({ children }) => {
 };
 
 // --- UI Components ---
-const Card = ({ children, className = '' }) => (
+const Card = ({ children, className = '' }) => ( /* ... same ... */ 
     <div className={`bg-white shadow-xl rounded-lg p-6 md:p-8 ${className}`}>
         {children}
     </div>
 );
-
-const Button = ({ children, onClick, className = '', variant = 'primary', disabled = false }) => {
-    const styles = {
-        primary: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500',
-        secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800 focus:ring-gray-400',
-        danger: 'bg-red-500 hover:bg-red-600 text-white focus:ring-red-400',
-    };
-    return (
-        <button onClick={onClick} disabled={disabled}
-            className={`px-6 py-3 rounded-lg font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-opacity-75 transition-all ${styles[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
-            {children}
-        </button>
-    );
-};
-
-const LoadingSpinner = ({ message = "Loading..."}) => (
+const Button = ({ children, onClick, className = '', variant = 'primary', disabled = false }) => ( /* ... same ... */ 
+    <button onClick={onClick} disabled={disabled}
+        className={`px-6 py-3 rounded-lg font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-opacity-75 transition-all ${
+            variant === 'primary' ? 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500' :
+            variant === 'secondary' ? 'bg-gray-200 hover:bg-gray-300 text-gray-800 focus:ring-gray-400' :
+            'bg-red-500 hover:bg-red-600 text-white focus:ring-red-400' // Default to danger or add more variants
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
+        {children}
+    </button>
+);
+const LoadingSpinner = ({ message = "Loading..."}) => ( /* ... same ... */ 
     <div className="flex flex-col items-center justify-center p-10 text-gray-700">
         <svg className="animate-spin h-10 w-10 text-blue-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
@@ -367,7 +334,6 @@ const LoadingSpinner = ({ message = "Loading..."}) => (
         <p className="text-lg">{message}</p>
     </div>
 );
-
 const createConfettiPiece = () => { /* ... same as before ... */ 
     const piece = document.createElement('div');
     piece.style.position = 'fixed';
@@ -402,7 +368,6 @@ const triggerConfetti = (count = 150) => { /* ... same as before ... */
         setTimeout(() => { const piece = createConfettiPiece(); animateConfettiPiece(piece); }, i * 15);
     }
 };
-
 const ProjectIcon = ({ project, onDragStart }) => ( /* ... same as before ... */ 
     <div draggable onDragStart={(e) => onDragStart(e, project.id)}
         className="flex flex-col items-center justify-center p-1 sm:p-2 m-1 border-2 border-dashed border-gray-300 rounded-lg cursor-grab hover:bg-gray-100 transition-colors aspect-square"
@@ -419,7 +384,6 @@ const ProjectIcon = ({ project, onDragStart }) => ( /* ... same as before ... */
         )}
     </div>
 );
-
 const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOver, projectCount }) => ( /* ... same as before ... */ 
     <div onDrop={(e) => onDrop(e, locationDetails.id)} onDragOver={onDragOver} onDragLeave={onDragLeave}
         className={`mt-6 p-6 md:p-8 border-4 border-dashed rounded-xl text-center transition-all duration-200 ease-in-out min-h-[150px] flex flex-col justify-center items-center
@@ -434,8 +398,10 @@ const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOv
 );
 
 const WeeklyLogDisplay = () => {
-    const { weeklyRecords, isLoading, logWeekAndResetBoard, isProcessingWeek, weeklyGoal, updateWeeklyTarget, isUpdatingTarget } = useContext(AppContext); 
+    const { weeklyRecords, isLoading, logWeekAndResetBoard, isProcessingWeek, weeklyGoal, updateWeeklyTarget, isUpdatingTarget, updateWeeklyRecord, isUpdatingRecord } = useContext(AppContext); 
     const [newTargetInput, setNewTargetInput] = useState(weeklyGoal.toString());
+    const [editingRecordId, setEditingRecordId] = useState(null);
+    const [editFormData, setEditFormData] = useState({ completed: '', topSalespersonName: '', topSalespersonProjects: '' });
 
     useEffect(() => {
         setNewTargetInput(weeklyGoal.toString());
@@ -451,6 +417,43 @@ const WeeklyLogDisplay = () => {
         }
     };
 
+    const handleEditClick = (record) => {
+        setEditingRecordId(record.id);
+        setEditFormData({
+            completed: record.completed.toString(),
+            topSalespersonName: record.topSalespersonName || '',
+            topSalespersonProjects: record.topSalespersonProjects?.toString() || '0',
+            target: record.target.toString() // Keep original target for display, not editable here
+        });
+    };
+
+    const handleEditFormChange = (e) => {
+        setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
+    };
+
+    const handleSaveEdit = async (recordId) => {
+        const completed = parseInt(editFormData.completed, 10);
+        const topSalespersonProjects = parseInt(editFormData.topSalespersonProjects, 10);
+
+        if (isNaN(completed) || completed < 0) {
+            alert("Please enter a valid number for completed projects.");
+            return;
+        }
+        if (isNaN(topSalespersonProjects) || topSalespersonProjects < 0) {
+            alert("Please enter a valid number for top salesperson projects.");
+            return;
+        }
+        
+        const success = await updateWeeklyRecord(recordId, {
+            completed,
+            topSalespersonName: editFormData.topSalespersonName,
+            topSalespersonProjects
+        });
+        if (success) {
+            setEditingRecordId(null);
+        }
+    };
+
     if (isLoading && weeklyRecords.length === 0) { 
         return <LoadingSpinner message="Loading weekly records..." />;
     }
@@ -459,48 +462,68 @@ const WeeklyLogDisplay = () => {
         <Card className="bg-gray-50 h-full flex flex-col">
             <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Weekly Performance</h2>
             {weeklyRecords.length > 0 ? (
-                <ul className="space-y-2 max-h-64 overflow-y-auto pr-2 flex-grow mb-4"> {/* Adjusted max-h */}
+                <ul className="space-y-2 max-h-64 overflow-y-auto pr-2 flex-grow mb-4"> 
                     {weeklyRecords.map(record => (
                         <li key={record.id} className={`p-3 rounded-lg shadow text-gray-700 ${record.completed >= record.target ? 'bg-green-100 border-green-400' : 'bg-red-100 border-red-400'}`}>
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="font-medium text-md">{record.weekDisplay}</span>
-                                <span className={`font-bold text-lg ${record.completed >= record.target ? 'text-green-600' : 'text-red-600'}`}>
-                                    {record.completed}/{record.target}
-                                </span>
-                            </div>
-                             {/* Display Top Salesperson Info */}
-                            {record.topSalespersonName && record.topSalespersonName !== "N/A" && (
-                                <p className="text-xs text-gray-600">
-                                    Top: {record.topSalespersonName} ({record.topSalespersonProjects})
-                                </p>
+                            {editingRecordId === record.id ? (
+                                <div className="space-y-2">
+                                    <p className="font-medium text-md mb-1">{record.weekDisplay} (Target: {editFormData.target})</p>
+                                    <div>
+                                        <label htmlFor={`editCompleted-${record.id}`} className="text-xs font-medium text-gray-600">Completed:</label>
+                                        <input type="number" name="completed" id={`editCompleted-${record.id}`} value={editFormData.completed} onChange={handleEditFormChange} className="w-full p-1 border border-gray-300 rounded text-sm"/>
+                                    </div>
+                                    <div>
+                                        <label htmlFor={`editTopSalespersonName-${record.id}`} className="text-xs font-medium text-gray-600">Top Salesperson:</label>
+                                        <input type="text" name="topSalespersonName" id={`editTopSalespersonName-${record.id}`} value={editFormData.topSalespersonName} onChange={handleEditFormChange} className="w-full p-1 border border-gray-300 rounded text-sm"/>
+                                    </div>
+                                    <div>
+                                        <label htmlFor={`editTopSalespersonProjects-${record.id}`} className="text-xs font-medium text-gray-600">Their Projects:</label>
+                                        <input type="number" name="topSalespersonProjects" id={`editTopSalespersonProjects-${record.id}`} value={editFormData.topSalespersonProjects} onChange={handleEditFormChange} className="w-full p-1 border border-gray-300 rounded text-sm"/>
+                                    </div>
+                                    <div className="flex gap-2 mt-2">
+                                        <Button onClick={() => handleSaveEdit(record.id)} variant="primary" className="py-1 px-3 text-xs" disabled={isUpdatingRecord}>{isUpdatingRecord ? "Saving..." : "Save"}</Button>
+                                        <Button onClick={() => setEditingRecordId(null)} variant="secondary" className="py-1 px-3 text-xs">Cancel</Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="font-medium text-md">{record.weekDisplay}</span>
+                                        <span className={`font-bold text-lg ${record.completed >= record.target ? 'text-green-600' : 'text-red-600'}`}>
+                                            {record.completed}/{record.target}
+                                        </span>
+                                    </div>
+                                    {record.topSalespersonName && record.topSalespersonName !== "N/A" && (
+                                        <p className="text-xs text-gray-600">
+                                            Top: {record.topSalespersonName} ({record.topSalespersonProjects})
+                                        </p>
+                                    )}
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        {record.completed >= record.target ? `Goal Met! 🎉 (+${record.completed - record.target})` : `Short by ${record.target - record.completed}`}
+                                    </p>
+                                    <Button onClick={() => handleEditClick(record)} variant="secondary" className="py-1 px-2 text-xs mt-2 float-right" disabled={isUpdatingRecord || isProcessingWeek}>Edit</Button>
+                                </>
                             )}
-                            <p className="text-xs text-gray-500 mt-0.5">
-                                {record.completed >= record.target ? `Goal Met! 🎉 (+${record.completed - record.target})` : `Short by ${record.target - record.completed}`}
-                            </p>
                         </li>
                     ))}
                 </ul>
             ) : (
                 <p className="text-gray-600 text-center py-4 flex-grow flex items-center justify-center">No weekly records yet.</p>
             )}
-            {/* Weekly Target Input */}
             <form onSubmit={handleTargetSubmit} className="mt-auto pt-4 border-t border-gray-200">
                 <label htmlFor="weeklyTargetInput" className="block text-sm font-medium text-gray-700 mb-1">Set Weekly Target:</label>
                 <div className="flex items-center gap-2 mb-3">
                     <input 
-                        type="number" 
-                        id="weeklyTargetInput"
-                        value={newTargetInput}
+                        type="number" id="weeklyTargetInput" value={newTargetInput}
                         onChange={(e) => setNewTargetInput(e.target.value)}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 text-md"
-                        disabled={isUpdatingTarget || isLoading}
-                        min="1"
+                        disabled={isUpdatingTarget || isLoading} min="1"
                     />
                     <Button type="submit" variant="secondary" className="py-2 px-4 text-sm" disabled={isUpdatingTarget || isLoading}>
                         {isUpdatingTarget ? "Saving..." : "Set"}
                     </Button>
                 </div>
-                <Button onClick={() => logWeekAndResetBoard(false)} variant="danger" className="w-full" disabled={isLoading || isProcessingWeek}>
+                <Button onClick={() => logWeekAndResetBoard(false)} variant="danger" className="w-full" disabled={isLoading || isProcessingWeek || isUpdatingRecord}>
                     {isProcessingWeek ? 'Processing...' : 'Finalize Week & Reset Board'}
                 </Button>
             </form>
@@ -508,7 +531,7 @@ const WeeklyLogDisplay = () => {
     );
 };
 
-const InputPage = () => { /* ... same InputPage structure as before, WeeklyLogDisplay will now include the button and input */ 
+const InputPage = () => { /* ... same InputPage structure as before ... */ 
     const { 
         addProject, salespersons, projectTypes, setCurrentPage, isLoading, 
         isProcessingWeek, locationsData: locations, loggedProjects
