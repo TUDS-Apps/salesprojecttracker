@@ -43,24 +43,17 @@ const LOCATIONS = {
 
 const isIconUrl = (iconString) => typeof iconString === 'string' && (iconString.startsWith('http') || iconString.startsWith('/') || iconString.includes('.'));
 
+// --- Date Helper Functions ---
 const formatDate = (date, options = { month: 'short', day: 'numeric' }) => {
     if (!date) return '';
+    // Ensure the date is treated as UTC to avoid timezone shifts when only date part matters.
+    // However, for display, local time is usually preferred.
+    // For consistency in week calculation, we'll be careful.
+    // For display, toLocaleDateString is fine.
     return new Date(date).toLocaleDateString(undefined, options);
 };
 
-const getWeekEndDate = (dateForWeek) => {
-    const date = new Date(dateForWeek);
-    const day = date.getDay(); 
-    const diff = date.getDate() - day + (day === 0 ? 0 : 7); 
-    return new Date(date.setDate(diff));
-};
-
-const getWeekStartDate = (sundayEndDate) => {
-    const startDate = new Date(sundayEndDate);
-    startDate.setDate(sundayEndDate.getDate() - 6);
-    return startDate;
-};
-
+// --- Context for Application State ---
 const AppContext = createContext();
 
 const AppProvider = ({ children }) => {
@@ -108,7 +101,7 @@ const AppProvider = ({ children }) => {
     useEffect(() => {
         setIsLoading(true); 
         const projectsQuery = query(collection(db, PROJECTS_COLLECTION), orderBy('timestamp', 'desc'));
-        const recordsQuery = query(collection(db, WEEKLY_RECORDS_COLLECTION), orderBy('weekEndDate', 'desc'));
+        const recordsQuery = query(collection(db, WEEKLY_RECORDS_COLLECTION), orderBy('weekEndDate', 'desc')); // Ensure records are ordered by week end
         let projectsLoaded = false;
         let recordsLoaded = false;
         const checkAllLoaded = () => { if (projectsLoaded && recordsLoaded) setIsLoading(false); };
@@ -201,10 +194,19 @@ const AppProvider = ({ children }) => {
         }
         setIsProcessingWeek(true);
         try {
-            const today = new Date();
-            const weekEnd = getWeekEndDate(today); 
-            const weekStart = getWeekStartDate(weekEnd);
-            const weekDisplay = `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
+            const today = new Date(); // Date when the function is run (e.g., Sunday for auto-reset)
+            
+            // Calculate the Saturday of the week that just ended.
+            const saturdayOfLoggedWeek = new Date(today);
+            saturdayOfLoggedWeek.setDate(today.getDate() - (today.getDay() === 0 ? 1 : (today.getDay() % 7))); // if today is Sun (0), subtract 1. If Sat (6), subtract 0. If Mon (1), subtract 2.
+            saturdayOfLoggedWeek.setHours(23, 59, 59, 999); // End of Saturday
+
+            // Calculate the Sunday of that same week.
+            const sundayOfLoggedWeek = new Date(saturdayOfLoggedWeek);
+            sundayOfLoggedWeek.setDate(saturdayOfLoggedWeek.getDate() - 6);
+            sundayOfLoggedWeek.setHours(0, 0, 0, 0); // Start of Sunday
+
+            const weekDisplay = `${formatDate(sundayOfLoggedWeek)} - ${formatDate(saturdayOfLoggedWeek)}`;
             const completed = projectsForLog.length; 
 
             let topSalespersonName = "N/A";
@@ -236,7 +238,7 @@ const AppProvider = ({ children }) => {
                 weekDisplay,
                 completed,
                 target: currentWeeklyGoal, 
-                weekEndDate: weekEnd.toISOString(), 
+                weekEndDate: saturdayOfLoggedWeek.toISOString(), // Store Saturday as the week end
                 topSalespersonName, 
                 topSalespersonProjects, 
                 loggedAt: serverTimestamp()
@@ -246,7 +248,7 @@ const AppProvider = ({ children }) => {
             await deleteAllProjectsFromBoard();
 
             if (!isAuto) alert("Current projects logged for the week and display board has been reset.");
-            else console.log("Weekly projects automatically logged and board reset.");
+            else console.log("Weekly projects automatically logged and board reset for week ending: " + saturdayOfLoggedWeek.toLocaleDateString());
 
         } catch (error) {
             console.error("Error logging week and resetting board: ", error);
@@ -283,14 +285,18 @@ const AppProvider = ({ children }) => {
             const lastAutoResetSunday = localStorage.getItem('lastAutoResetSunday');
 
             if (lastAutoResetSunday !== todayISO) {
-                if (currentProjects && currentProjects.length > 0) { 
-                    console.log("Attempting automatic Sunday log and reset...");
-                    await logWeekAndResetBoard(true, currentProjects); 
-                    localStorage.setItem('lastAutoResetSunday', todayISO);
-                } else {
-                    localStorage.setItem('lastAutoResetSunday', todayISO);
-                    console.log("Automatic Sunday check: No projects to log, board is already clear or was cleared. Marked Sunday as processed.");
-                }
+                // Check if there are projects to log. If the board was manually reset on Sat, currentProjects might be 0.
+                // We should log based on projects that *were* there before reset, if possible, or just reset if empty.
+                // The current logic uses `currentProjects` which are projects *currently* on the board.
+                // This means if a manual reset happened right before Sunday, the auto-log might log 0.
+                // For simplicity, we'll stick to logging what's currently on the board if it's an auto-reset.
+                // A more robust solution would involve snapshotting before a manual reset if it's close to Sunday.
+                
+                console.log("Attempting automatic Sunday log and reset...");
+                // Pass currentProjects to ensure the log is based on the data at the time of reset
+                await logWeekAndResetBoard(true, currentProjects); 
+                localStorage.setItem('lastAutoResetSunday', todayISO);
+                
             }
         }
     };
@@ -520,6 +526,7 @@ const WeeklyLogDisplay = () => {
             ) : (
                 <p className="text-gray-600 text-center py-4 flex-grow flex items-center justify-center">No weekly records yet.</p>
             )}
+            {/* Form for setting target and finalizing week */}
             <form onSubmit={handleTargetSubmit} className="mt-auto pt-4 border-t border-gray-200">
                 <label htmlFor="weeklyTargetInput" className="block text-sm font-medium text-gray-700 mb-1">Set Weekly Target:</label>
                 <div className="flex items-center gap-2 mb-3">
@@ -533,9 +540,15 @@ const WeeklyLogDisplay = () => {
                         {isUpdatingTarget ? "Saving..." : "Set"}
                     </Button>
                 </div>
-                <Button onClick={() => logWeekAndResetBoard(false)} variant="danger" className="w-full" disabled={isLoading || isProcessingWeek || isUpdatingRecord}>
-                    {isProcessingWeek ? 'Processing...' : 'Finalize Week & Reset Board'}
-                </Button>
+                {/* Finalize Week Button - Made smaller and less prominent */}
+                <button 
+                    type="button" // Important: type="button" to prevent form submission
+                    onClick={() => logWeekAndResetBoard(false)} 
+                    className="w-full text-xs text-red-600 hover:text-red-800 disabled:opacity-50 py-2 rounded-md border border-red-300 hover:bg-red-50 transition-colors" 
+                    disabled={isLoading || isProcessingWeek || isUpdatingRecord}
+                >
+                    {isProcessingWeek ? 'Processing...' : 'Admin: Finalize Week & Reset Board'}
+                </button>
             </form>
         </Card>
     );
