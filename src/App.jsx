@@ -1,9 +1,8 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { db } from './firebase'; // Make sure firebase.js is in the src folder
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDoc, getDocs, writeBatch, setDoc, updateDoc } from "firebase/firestore"; 
-// Removed: import { Edit3 } from 'lucide-react'; 
-// If Edit3 or other lucide-react icons are used elsewhere, you'll need to keep the dependency.
-// For this specific change, we are replacing the pencil icon.
+// Lucide-react import is removed as the pencil icon is an emoji.
+// If other lucide icons are needed elsewhere, the dependency and imports should be managed accordingly.
 
 // Tailwind CSS is assumed to be available globally.
 
@@ -185,7 +184,7 @@ const AppProvider = ({ children }) => {
         await batch.commit();
     };
     
-        const logWeekAndResetBoard = async (isAuto = false, projectsForLog = loggedProjects) => { 
+    const logWeekAndResetBoard = async (isAuto = false, projectsForLog = loggedProjects) => { 
         if (!isAuto && !window.confirm("This will log the current week's project count, save it, and then clear the display board. Are you sure?")) {
             return;
         }
@@ -193,35 +192,20 @@ const AppProvider = ({ children }) => {
         try {
             const today = new Date(); 
             
-            // Calculate the Saturday of the week that JUST ENDED.
-            const endOfLastWeek = new Date(today);
+            // Corrected logic for Sunday-Saturday week that just ended
+            const endOfLoggedWeek = new Date(today);
             // today.getDay() is 0 for Sunday, 1 for Mon, ..., 6 for Sat.
-            // To get the previous Saturday:
-            // If today is Sunday (0), subtract 1 day.
-            // If today is Monday (1), subtract 2 days.
-            // ...
-            // If today is Saturday (6), subtract 0 days (or 7 if we want strictly *previous* week's Sat, but for logging current week, 0 is fine if run on Sat).
-            // For consistency, let's always target the Saturday of the week ending *before or on* today.
-            // If today is Sunday, we want *yesterday* (Saturday).
-            // If today is Saturday, we want *today* (Saturday).
-            endOfLastWeek.setDate(today.getDate() - (today.getDay() === 0 ? 1 : (today.getDay() - 6 + 7) % 7));
-            // Simpler way for previous Saturday or today if Saturday:
-            // endOfLastWeek.setDate(today.getDate() - (today.getDay() === 0 ? 1 : (today.getDay() % 7) -6 +7)%7 ); // This is still complex
-            
-            // Corrected and simplified logic for Sunday-Saturday week:
-            // endOfLastWeek is the Saturday of the week we're logging.
-            // If today is Sunday, the week just ended was the one whose Saturday was yesterday.
-            // If today is Monday, the week just ended was the one whose Saturday was 2 days ago.
-            // If today is Saturday, the week just ended is the one whose Saturday is today.
-            endOfLastWeek.setDate(today.getDate() - ((today.getDay() + 1) % 7) ); // This gets the most recent Saturday
-            endOfLastWeek.setHours(23, 59, 59, 999); // End of Saturday
+            // To get the Saturday of the week that just ended:
+            // Subtract today's day number (0 for Sun, 1 for Mon, etc.) to get to the previous Sunday (or today if Sunday).
+            // Then subtract 1 more day to get to the previous Saturday.
+            endOfLoggedWeek.setDate(today.getDate() - today.getDay() - 1); 
+            endOfLoggedWeek.setHours(23, 59, 59, 999); // End of Saturday
 
-            const startOfLastWeek = new Date(endOfLastWeek);
-            startOfLastWeek.setDate(endOfLastWeek.getDate() - 6); // Go back 6 days to get Sunday
-            startOfLastWeek.setHours(0, 0, 0, 0); // Start of Sunday
+            const startOfLoggedWeek = new Date(endOfLoggedWeek);
+            startOfLoggedWeek.setDate(endOfLoggedWeek.getDate() - 6); // Go back 6 days to get Sunday
+            startOfLoggedWeek.setHours(0, 0, 0, 0); // Start of Sunday
 
-
-            const weekDisplay = `${formatDate(startOfLastWeek)} - ${formatDate(endOfLastWeek)}`;
+            const weekDisplay = `${formatDate(startOfLoggedWeek)} - ${formatDate(endOfLoggedWeek)}`;
             const completed = projectsForLog.length; 
 
             let topSalespersonName = "N/A";
@@ -253,7 +237,7 @@ const AppProvider = ({ children }) => {
                 weekDisplay,
                 completed,
                 target: currentWeeklyGoal, 
-                weekEndDate: endOfLastWeek.toISOString(), 
+                weekEndDate: endOfLoggedWeek.toISOString(), 
                 topSalespersonName, 
                 topSalespersonProjects, 
                 loggedAt: serverTimestamp()
@@ -263,7 +247,7 @@ const AppProvider = ({ children }) => {
             await deleteAllProjectsFromBoard();
 
             if (!isAuto) alert("Current projects logged for the week and display board has been reset.");
-            else console.log("Weekly projects automatically logged and board reset for week ending: " + endOfLastWeek.toLocaleDateString());
+            else console.log("Weekly projects automatically logged and board reset for week ending: " + endOfLoggedWeek.toLocaleDateString());
 
         } catch (error) {
             console.error("Error logging week and resetting board: ", error);
