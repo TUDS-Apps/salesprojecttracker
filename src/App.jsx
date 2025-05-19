@@ -195,10 +195,13 @@ const AppProvider = ({ children }) => {
             // Corrected logic for Sunday-Saturday week that just ended
             const endOfLoggedWeek = new Date(today);
             // today.getDay() is 0 for Sunday, 1 for Mon, ..., 6 for Sat.
-            // To get the Saturday of the week that just ended:
-            // Subtract today's day number (0 for Sun, 1 for Mon, etc.) to get to the previous Sunday (or today if Sunday).
-            // Then subtract 1 more day to get to the previous Saturday.
-            endOfLoggedWeek.setDate(today.getDate() - today.getDay() - 1); 
+            // To get the Saturday of the week that just ended (or today if today is Saturday):
+            // Subtract (today.getDay() + 1) % 7 days.
+            // If today is Sunday (0), (0+1)%7 = 1. Subtract 1 day -> previous Saturday.
+            // If today is Monday (1), (1+1)%7 = 2. Subtract 2 days -> previous Saturday.
+            // ...
+            // If today is Saturday (6), (6+1)%7 = 0. Subtract 0 days -> today (Saturday).
+            endOfLoggedWeek.setDate(today.getDate() - ((today.getDay() + 1) % 7) ); 
             endOfLoggedWeek.setHours(23, 59, 59, 999); // End of Saturday
 
             const startOfLoggedWeek = new Date(endOfLoggedWeek);
