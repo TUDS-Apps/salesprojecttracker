@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write access to all documents for authenticated users
+    // For now, we'll allow all access since there's no authentication
+    // TODO: Add authentication and update these rules
+    
+    // Projects collection - stores current week's projects
+    match /projects/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Weekly records - historical data
+    match /weeklyRecords/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // App settings - configuration data
+    match /appSettings/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Backup collection - archived projects
+    match /projectsBackup/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Temporary catch-all rule - remove this after setting up specific rules
+    match /{document=**} {
+      allow read, write: if request.time < timestamp.date(2025, 12, 31);
+    }
+  }
+}

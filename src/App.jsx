@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { db } from './firebase'; // Make sure firebase.js is in the src folder
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, getDoc, getDocs, writeBatch, setDoc, updateDoc } from "firebase/firestore"; 
+import { collection, addDoc, onSnapshot, query, orderBy, where, serverTimestamp, deleteDoc, doc, getDoc, getDocs, writeBatch, setDoc, updateDoc } from "firebase/firestore"; 
 // Lucide-react import is removed as the pencil icon is an emoji.
 // If other lucide icons are needed elsewhere, the dependency and imports should be managed accordingly.
 
@@ -103,8 +103,11 @@ const AppProvider = ({ children }) => {
         const checkAllLoaded = () => { if (projectsLoaded && recordsLoaded) setIsLoading(false); };
 
         const unsubscribeProjects = onSnapshot(projectsQuery, (querySnapshot) => {
-            const projectsData = querySnapshot.docs.map(pDoc => ({ ...pDoc.data(), id: pDoc.id }));
+            const projectsData = querySnapshot.docs
+                .map(pDoc => ({ ...pDoc.data(), id: pDoc.id }))
+                .filter(project => !project.archived); // Filter out archived projects
             setLoggedProjects(projectsData);
+            // Re-enabled with safety: Automatic Sunday reset with archiving instead of deletion
             handleAutoSundayReset(projectsData); 
             projectsLoaded = true; checkAllLoaded();
         }, (error) => { console.error("Error fetching projects: ", error); alert("Could not fetch project data."); projectsLoaded = true; checkAllLoaded(); });
@@ -177,11 +180,27 @@ const AppProvider = ({ children }) => {
     const deleteAllProjectsFromBoard = async () => { 
         const projectsQuerySnapshot = await getDocs(collection(db, PROJECTS_COLLECTION));
         if (projectsQuerySnapshot.empty) return;
+        
+        // Instead of deleting, mark projects as archived
         const batch = writeBatch(db);
+        const archiveTimestamp = new Date().toISOString();
+        
         projectsQuerySnapshot.docs.forEach(pDoc => {
-            batch.delete(doc(db, PROJECTS_COLLECTION, pDoc.id));
+            // Move to archive by updating with archived flag
+            batch.update(doc(db, PROJECTS_COLLECTION, pDoc.id), {
+                archived: true,
+                archivedAt: archiveTimestamp,
+                visible: false
+            });
         });
-        await batch.commit();
+        
+        try {
+            await batch.commit();
+            console.log(`Archived ${projectsQuerySnapshot.size} projects instead of deleting`);
+        } catch (error) {
+            console.error("Failed to archive projects:", error);
+            throw error;
+        }
     };
     
     const logWeekAndResetBoard = async (isAuto = false, projectsForLog = loggedProjects) => { 
@@ -246,11 +265,40 @@ const AppProvider = ({ children }) => {
                 loggedAt: serverTimestamp()
             };
 
-            await addDoc(collection(db, WEEKLY_RECORDS_COLLECTION), newRecord);
-            await deleteAllProjectsFromBoard();
-
-            if (!isAuto) alert("Current projects logged for the week and display board has been reset.");
-            else console.log("Weekly projects automatically logged and board reset for week ending: " + endOfLoggedWeek.toLocaleDateString());
+            // First, try to save the weekly record
+            const recordRef = await addDoc(collection(db, WEEKLY_RECORDS_COLLECTION), newRecord);
+            
+            // Only delete projects if the weekly record was successfully saved
+            if (recordRef.id) {
+                // Backup projects before deletion
+                const backupCollection = collection(db, 'projectsBackup');
+                const backupBatch = writeBatch(db);
+                
+                for (const project of projectsForLog) {
+                    const backupDoc = doc(backupCollection);
+                    backupBatch.set(backupDoc, {
+                        ...project,
+                        backedUpAt: serverTimestamp(),
+                        weekArchived: weekDisplay,
+                        originalId: project.id
+                    });
+                }
+                
+                try {
+                    await backupBatch.commit();
+                    console.log(`Backed up ${projectsForLog.length} projects before deletion`);
+                } catch (backupError) {
+                    console.error("Failed to backup projects:", backupError);
+                    // Continue with deletion anyway, as weekly record is already saved
+                }
+                
+                await deleteAllProjectsFromBoard();
+                
+                if (!isAuto) alert("Current projects logged for the week and display board has been reset.");
+                else console.log("Weekly projects automatically logged and board reset for week ending: " + endOfLoggedWeek.toLocaleDateString());
+            } else {
+                throw new Error("Failed to save weekly record - projects NOT deleted for safety");
+            }
 
         } catch (error) {
             console.error("Error logging week and resetting board: ", error);
@@ -293,6 +341,23 @@ const AppProvider = ({ children }) => {
             }
         }
     };
+    
+    const exportDataToJSON = () => {
+        const data = {
+            projects: loggedProjects,
+            weeklyRecords: weeklyRecords,
+            weeklyGoal: currentWeeklyGoal,
+            exportDate: new Date().toISOString(),
+            exportVersion: "1.0"
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `project-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     return (
         <AppContext.Provider value={{ 
@@ -302,7 +367,7 @@ const AppProvider = ({ children }) => {
             salespersons: SALESPERSONS, projectTypes: PROJECT_TYPES, 
             logWeekAndResetBoard, updateWeeklyRecord: updateWeeklyRecordInDB, 
             isLoading, isProcessingWeek, isUpdatingTarget, isUpdatingRecord, 
-            locationsData: LOCATIONS 
+            locationsData: LOCATIONS, exportDataToJSON
         }}>
             {children}
         </AppContext.Provider>
@@ -398,7 +463,7 @@ const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOv
 );
 
 const WeeklyLogDisplay = () => {
-    const { weeklyRecords, isLoading, logWeekAndResetBoard, isProcessingWeek, weeklyGoal, updateWeeklyTarget, isUpdatingTarget, updateWeeklyRecord, isUpdatingRecord } = useContext(AppContext); 
+    const { weeklyRecords, isLoading, logWeekAndResetBoard, isProcessingWeek, weeklyGoal, updateWeeklyTarget, isUpdatingTarget, updateWeeklyRecord, isUpdatingRecord, exportDataToJSON } = useContext(AppContext); 
     const [newTargetInput, setNewTargetInput] = useState(weeklyGoal.toString());
     const [editingRecordId, setEditingRecordId] = useState(null);
     const [editFormData, setEditFormData] = useState({ completed: '', topSalespersonName: '', topSalespersonProjects: '' });
@@ -541,6 +606,15 @@ const WeeklyLogDisplay = () => {
                     disabled={isLoading || isProcessingWeek || isUpdatingRecord}
                 >
                     {isProcessingWeek ? 'Processing...' : 'Admin: Manual Week Log & Reset'}
+                </button>
+                {/* Export Data Button */}
+                <button 
+                    type="button" 
+                    onClick={exportDataToJSON} 
+                    className="w-full text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50 py-2 rounded-md border border-blue-300 hover:bg-blue-50 transition-colors mt-2" 
+                    disabled={isLoading}
+                >
+                    Export Data Backup (JSON)
                 </button>
             </form>
         </Card>
