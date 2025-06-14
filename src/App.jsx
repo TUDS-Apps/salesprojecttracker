@@ -517,12 +517,14 @@ const WeeklyLogDisplay = () => {
     const handleDeleteRecord = async (recordId, weekDisplay) => {
         if (window.confirm(`Are you sure you want to permanently delete the record for ${weekDisplay}? This cannot be undone.`)) {
             try {
-                await deleteDoc(doc(db, WEEKLY_RECORDS_COLLECTION, recordId));
+                const recordRef = doc(db, WEEKLY_RECORDS_COLLECTION, recordId);
+                await deleteDoc(recordRef);
                 alert("Weekly record deleted successfully!");
                 setEditingRecordId(null);
             } catch (error) {
                 console.error("Error deleting weekly record: ", error);
-                alert("Failed to delete weekly record.");
+                console.error("Error details:", error.message, error.code);
+                alert(`Failed to delete weekly record. Error: ${error.message}`);
             }
         }
     };
