@@ -982,16 +982,15 @@ const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOv
     </div>
 );
 
-const WeeklyLogDisplay = () => {
-    const { weeklyRecords, isLoading, logWeekAndResetBoard, isProcessingWeek, weeklyGoal, updateWeeklyTarget, isUpdatingTarget, updateWeeklyRecord, isUpdatingRecord, exportDataToJSON } = useContext(AppContext); 
+// Admin Controls Component
+const AdminControls = () => {
+    const { weeklyGoal, updateWeeklyTarget, isUpdatingTarget, logWeekAndResetBoard, isProcessingWeek, exportDataToJSON, isLoading, isUpdatingRecord } = useContext(AppContext);
     const [newTargetInput, setNewTargetInput] = useState(weeklyGoal.toString());
-    const [editingRecordId, setEditingRecordId] = useState(null);
-    const [editFormData, setEditFormData] = useState({ completed: '', topSalespersonName: '', topSalespersonProjects: '' });
-
+    
     useEffect(() => {
         setNewTargetInput(weeklyGoal.toString());
     }, [weeklyGoal]);
-
+    
     const handleTargetSubmit = async (e) => {
         e.preventDefault();
         const targetValue = parseInt(newTargetInput, 10);
@@ -1001,6 +1000,53 @@ const WeeklyLogDisplay = () => {
             alert("Please enter a valid positive number for the target.");
         }
     };
+    
+    return (
+        <Card className="bg-gray-50">
+            <h2 className="text-2xl font-semibold text-gray-700 mb-4">Admin Controls</h2>
+            
+            <form onSubmit={handleTargetSubmit} className="mb-4">
+                <label htmlFor="weeklyTargetInput" className="block text-sm font-medium text-gray-700 mb-1">Set Weekly Target:</label>
+                <div className="flex items-center gap-2">
+                    <input 
+                        type="number" id="weeklyTargetInput" value={newTargetInput}
+                        onChange={(e) => setNewTargetInput(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 text-md"
+                        disabled={isUpdatingTarget || isLoading} min="1"
+                    />
+                    <Button type="submit" variant="secondary" className="py-2 px-4 text-sm" disabled={isUpdatingTarget || isLoading}>
+                        {isUpdatingTarget ? "Saving..." : "Set"}
+                    </Button>
+                </div>
+            </form>
+            
+            <div className="space-y-2">
+                <button 
+                    type="button" 
+                    onClick={() => logWeekAndResetBoard(false)} 
+                    className="w-full text-sm text-orange-600 hover:text-orange-800 disabled:opacity-50 py-2 rounded-md border border-orange-300 hover:bg-orange-50 transition-colors font-medium" 
+                    disabled={isLoading || isProcessingWeek || isUpdatingRecord}
+                >
+                    {isProcessingWeek ? 'Processing...' : 'Manual Week Log & Reset'}
+                </button>
+                
+                <button 
+                    type="button" 
+                    onClick={exportDataToJSON} 
+                    className="w-full text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 py-2 rounded-md border border-blue-300 hover:bg-blue-50 transition-colors font-medium" 
+                    disabled={isLoading}
+                >
+                    Export Data Backup (JSON)
+                </button>
+            </div>
+        </Card>
+    );
+};
+
+const WeeklyLogDisplay = () => {
+    const { weeklyRecords, isLoading, updateWeeklyRecord, isUpdatingRecord } = useContext(AppContext); 
+    const [editingRecordId, setEditingRecordId] = useState(null);
+    const [editFormData, setEditFormData] = useState({ completed: '', topSalespersonName: '', topSalespersonProjects: '' });
 
     const handleEditClick = (record) => {
         setEditingRecordId(record.id);
@@ -1062,7 +1108,7 @@ const WeeklyLogDisplay = () => {
         <Card className="bg-gray-50 h-full flex flex-col">
             <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Weekly Performance</h2>
             {weeklyRecords.length > 0 ? (
-                <ul className="space-y-2 max-h-64 overflow-y-auto pr-2 flex-grow mb-4"> 
+                <ul className="space-y-2 max-h-[400px] overflow-y-auto pr-2 flex-grow mb-4"> 
                     {weeklyRecords.map(record => (
                         <li key={record.id} className={`p-3 rounded-lg shadow text-gray-700 ${record.completed >= record.target ? 'bg-green-100 border-green-400' : 'bg-red-100 border-red-400'}`}>
                             {editingRecordId === record.id ? (
@@ -1121,38 +1167,6 @@ const WeeklyLogDisplay = () => {
             ) : (
                 <p className="text-gray-600 text-center py-4 flex-grow flex items-center justify-center">No weekly records yet.</p>
             )}
-            <form onSubmit={handleTargetSubmit} className="mt-auto pt-4 border-t border-gray-200">
-                <label htmlFor="weeklyTargetInput" className="block text-sm font-medium text-gray-700 mb-1">Set Weekly Target:</label>
-                <div className="flex items-center gap-2 mb-3">
-                    <input 
-                        type="number" id="weeklyTargetInput" value={newTargetInput}
-                        onChange={(e) => setNewTargetInput(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 text-md"
-                        disabled={isUpdatingTarget || isLoading} min="1"
-                    />
-                    <Button type="submit" variant="secondary" className="py-2 px-4 text-sm" disabled={isUpdatingTarget || isLoading}>
-                        {isUpdatingTarget ? "Saving..." : "Set"}
-                    </Button>
-                </div>
-                {/* Finalize Week Button - Made smaller and less prominent */}
-                <button 
-                    type="button" 
-                    onClick={() => logWeekAndResetBoard(false)} 
-                    className="w-full text-xs text-orange-600 hover:text-orange-800 disabled:opacity-50 py-2 rounded-md border border-orange-300 hover:bg-orange-50 transition-colors" 
-                    disabled={isLoading || isProcessingWeek || isUpdatingRecord}
-                >
-                    {isProcessingWeek ? 'Processing...' : 'Admin: Manual Week Log & Reset'}
-                </button>
-                {/* Export Data Button */}
-                <button 
-                    type="button" 
-                    onClick={exportDataToJSON} 
-                    className="w-full text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50 py-2 rounded-md border border-blue-300 hover:bg-blue-50 transition-colors mt-2" 
-                    disabled={isLoading}
-                >
-                    Export Data Backup (JSON)
-                </button>
-            </form>
         </Card>
     );
 };
@@ -1269,15 +1283,12 @@ const InputPage = () => {
                 </Card>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-                <div> 
-                    <WeeklyLogDisplay />
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
                 <div> 
                     <Card className="bg-gray-50 h-full"> 
                         <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Salesperson Leaderboard</h2>
                         {isLoading && salespersonStats.length === 0 ? <LoadingSpinner message="Loading leaderboard..." /> : salespersonStats.length > 0 ? (
-                            <ul className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2"> 
+                            <ul className="space-y-2 max-h-[400px] overflow-y-auto pr-2"> 
                                 {salespersonStats.map((sp, index) => {
                                     const personalBest = personalBests[sp.id]?.weeklyBest || 0;
                                     const isNewRecord = personalBest > 0 && sp.projectCount >= personalBest;
@@ -1311,6 +1322,9 @@ const InputPage = () => {
                     </Card>
                 </div>
                 <div> 
+                    <WeeklyLogDisplay />
+                </div>
+                <div> 
                     <Card className="bg-gray-50 h-full"> 
                         <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Project Types This Week</h2>
                         {(() => {
@@ -1320,7 +1334,7 @@ const InputPage = () => {
                             })).sort((a, b) => b.count - a.count).filter(pt => pt.count > 0);
                             
                             return projectTypeCounts.length > 0 ? (
-                                <ul className="space-y-2">
+                                <ul className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
                                     {projectTypeCounts.map((pt, index) => (
                                         <li key={pt.id} className="p-3 rounded-lg shadow bg-white flex justify-between items-center">
                                             <div className="flex items-center gap-2">
@@ -1340,6 +1354,10 @@ const InputPage = () => {
                         })()}
                     </Card>
                 </div>
+            </div>
+            
+            <div className="mt-6">
+                <AdminControls />
             </div>
         </div>
     );
