@@ -10,14 +10,9 @@ import { collection, addDoc, onSnapshot, query, orderBy, where, serverTimestamp,
 const SALESPERSONS = [
     { id: 'dale', name: 'Dale', initials: 'DA' },
     { id: 'justin', name: 'Justin', initials: 'JU' },
-    { id: 'karen', name: 'Karen', initials: 'KA' },
     { id: 'meghan', name: 'Meghan', initials: 'ME' },
-    { id: 'pat', name: 'Pat', initials: 'PA' },
     { id: 'rickielee', name: 'Rickie-Lee', initials: 'RL' },
     { id: 'roberta', name: 'Roberta', initials: 'RO' },
-    { id: 'shane', name: 'Shane', initials: 'SH' },
-    { id: 'steve', name: 'Steve', initials: 'ST' },
-    { id: 'wade', name: 'Wade', initials: 'WA' },
     { id: 'sam', name: 'Sam', initials: 'SA' }, 
 ].sort((a, b) => a.name.localeCompare(b.name));
 
