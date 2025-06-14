@@ -984,11 +984,14 @@ const LocationBucket = ({ locationDetails, onDrop, onDragOver, onDragLeave, isOv
 
 // Admin Controls Component
 const AdminControls = () => {
-    const { weeklyGoal, updateWeeklyTarget, isUpdatingTarget, logWeekAndResetBoard, isProcessingWeek, exportDataToJSON, isLoading, isUpdatingRecord } = useContext(AppContext);
-    const [newTargetInput, setNewTargetInput] = useState(weeklyGoal.toString());
+    const { 
+        weeklyGoal, updateWeeklyTarget, isUpdatingTarget, logWeekAndResetBoard, 
+        isProcessingWeek, exportDataToJSON, isLoading, isUpdatingRecord 
+    } = useContext(AppContext) || {};
+    const [newTargetInput, setNewTargetInput] = useState((weeklyGoal || DEFAULT_WEEKLY_GOAL).toString());
     
     useEffect(() => {
-        setNewTargetInput(weeklyGoal.toString());
+        setNewTargetInput((weeklyGoal || DEFAULT_WEEKLY_GOAL).toString());
     }, [weeklyGoal]);
     
     const handleTargetSubmit = async (e) => {
