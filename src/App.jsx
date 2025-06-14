@@ -30,7 +30,21 @@ const DEFAULT_WEEKLY_GOAL = 60;
 const PROJECTS_COLLECTION = 'projects';
 const WEEKLY_RECORDS_COLLECTION = 'weeklyRecords'; 
 const APP_SETTINGS_COLLECTION = 'appSettings'; 
-const GOALS_DOCUMENT_ID = 'goals'; 
+const GOALS_DOCUMENT_ID = 'goals';
+const STREAKS_COLLECTION = 'streaks';
+const ACHIEVEMENTS_COLLECTION = 'achievements';
+const PERSONAL_BESTS_COLLECTION = 'personalBests';
+
+const TEAM_ACHIEVEMENTS = [
+    { id: 'first100', name: 'Century Club', description: 'First week with 100+ projects', icon: '💯', requirement: (stats) => stats.weeklyProjects >= 100 },
+    { id: 'perfectWeek', name: 'Perfect Week', description: 'Hit exactly the weekly goal', icon: '🎯', requirement: (stats) => stats.weeklyProjects === stats.weeklyGoal },
+    { id: 'mondayMotivator', name: 'Monday Motivator', description: '20+ projects on a Monday', icon: '💪', requirement: (stats) => stats.mondayProjects >= 20 },
+    { id: 'speedDemon', name: 'Speed Demon', description: '10 projects in 1 hour', icon: '⚡', requirement: (stats) => stats.hourlyMax >= 10 },
+    { id: 'allHands', name: 'All Hands on Deck', description: 'Every salesperson contributed in one day', icon: '🤝', requirement: (stats) => stats.allSalespeopleDay },
+    { id: 'doubleGoal', name: 'Double Trouble', description: 'Achieved 2x the weekly goal', icon: '2️⃣', requirement: (stats) => stats.weeklyProjects >= stats.weeklyGoal * 2 },
+    { id: 'streakMaster', name: 'Streak Master', description: 'Maintained a 7-day streak', icon: '🔥', requirement: (stats) => stats.currentStreak >= 7 },
+    { id: 'varietyPack', name: 'Variety Pack', description: 'All project types in one day', icon: '🎨', requirement: (stats) => stats.allProjectTypesDay },
+]; 
 
 const LOCATIONS = { 
     REGINA: { id: 'regina', name: 'Regina', abbreviation: 'RGNA', tileColor: 'bg-blue-100/80 border-blue-400', bucketColor: 'border-blue-400 bg-blue-50 hover:bg-blue-100', textColor: 'text-blue-700', bucketOverColor: 'border-blue-600 bg-blue-100 scale-105' },
@@ -55,7 +69,13 @@ const AppProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessingWeek, setIsProcessingWeek] = useState(false); 
     const [isUpdatingTarget, setIsUpdatingTarget] = useState(false);
-    const [isUpdatingRecord, setIsUpdatingRecord] = useState(false); 
+    const [isUpdatingRecord, setIsUpdatingRecord] = useState(false);
+    const [streakData, setStreakData] = useState({});
+    const [achievements, setAchievements] = useState([]);
+    const [personalBests, setPersonalBests] = useState({});
+    const [monthlyChampion, setMonthlyChampion] = useState(null);
+    const [lastMilestone, setLastMilestone] = useState(0);
+    const [liveUpdates, setLiveUpdates] = useState([]); 
 
     useEffect(() => {
         const getInitialPage = () => {
@@ -88,6 +108,56 @@ const AppProvider = ({ children }) => {
         });
         return () => unsubscribeGoal();
     }, []);
+    
+    // Load streak data
+    useEffect(() => {
+        const streakRef = doc(db, STREAKS_COLLECTION, 'teamStreak');
+        const unsubscribeStreak = onSnapshot(streakRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setStreakData(docSnap.data());
+            }
+        });
+        
+        // Load personal bests
+        const unsubscribeBests = onSnapshot(collection(db, PERSONAL_BESTS_COLLECTION), (snapshot) => {
+            const bests = {};
+            snapshot.docs.forEach(doc => {
+                bests[doc.id] = doc.data();
+            });
+            setPersonalBests(bests);
+        });
+        
+        // Load monthly champion
+        const championRef = doc(db, APP_SETTINGS_COLLECTION, 'monthlyChampion');
+        const unsubscribeChampion = onSnapshot(championRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                // Only show champion for current month
+                if (data.month === currentMonth) {
+                    setMonthlyChampion(data);
+                } else {
+                    setMonthlyChampion(null);
+                }
+            }
+        });
+        
+        // Load achievements
+        const unsubscribeAchievements = onSnapshot(collection(db, ACHIEVEMENTS_COLLECTION), (snapshot) => {
+            const achievementsList = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setAchievements(achievementsList);
+        });
+        
+        return () => {
+            unsubscribeStreak();
+            unsubscribeBests();
+            unsubscribeChampion();
+            unsubscribeAchievements();
+        };
+    }, []);
 
     useEffect(() => {
         setIsLoading(true); 
@@ -97,10 +167,34 @@ const AppProvider = ({ children }) => {
         let recordsLoaded = false;
         const checkAllLoaded = () => { if (projectsLoaded && recordsLoaded) setIsLoading(false); };
 
+        let previousProjectIds = new Set();
+        
         const unsubscribeProjects = onSnapshot(projectsQuery, (querySnapshot) => {
             const projectsData = querySnapshot.docs
                 .map(pDoc => ({ ...pDoc.data(), id: pDoc.id }))
                 .filter(project => !project.archived); // Filter out archived projects
+            
+            // Detect new projects for live updates
+            const currentProjectIds = new Set(projectsData.map(p => p.id));
+            if (previousProjectIds.size > 0) {
+                projectsData.forEach(project => {
+                    if (!previousProjectIds.has(project.id)) {
+                        // New project detected
+                        const update = {
+                            id: Date.now() + Math.random(),
+                            message: `${project.salespersonName} just added a ${project.projectName}!`,
+                            time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                        };
+                        setLiveUpdates(prev => [...prev, update]);
+                        // Remove notification after 5 seconds
+                        setTimeout(() => {
+                            setLiveUpdates(prev => prev.filter(u => u.id !== update.id));
+                        }, 5000);
+                    }
+                });
+            }
+            previousProjectIds = currentProjectIds;
+            
             setLoggedProjects(projectsData);
             // Re-enabled with safety: Automatic Sunday reset with archiving instead of deletion
             handleAutoSundayReset(projectsData); 
@@ -126,6 +220,97 @@ const AppProvider = ({ children }) => {
         localStorage.setItem('salesTrackerCurrentPage', page);
         window.location.hash = page === 'display' ? '#/display' : '#/input';
     };
+    
+    const updatePersonalBest = async (salespersonId, salespersonName) => {
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week (Sunday)
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const weekProjectCount = loggedProjects.filter(p => 
+            p.salespersonId === salespersonId && 
+            p.timestamp && new Date(p.timestamp.seconds * 1000) >= weekStart
+        ).length + 1; // +1 for the project just added
+        
+        const bestRef = doc(db, PERSONAL_BESTS_COLLECTION, salespersonId);
+        const bestDoc = await getDoc(bestRef);
+        
+        if (bestDoc.exists()) {
+            const currentBest = bestDoc.data().weeklyBest || 0;
+            if (weekProjectCount > currentBest) {
+                await updateDoc(bestRef, {
+                    weeklyBest: weekProjectCount,
+                    achievedDate: new Date().toISOString(),
+                    salespersonName
+                });
+                // Trigger special celebration for personal best
+                setTimeout(() => {
+                    showPersonalBestNotification(salespersonName, weekProjectCount);
+                }, 1000);
+            }
+        } else {
+            await setDoc(bestRef, {
+                weeklyBest: weekProjectCount,
+                achievedDate: new Date().toISOString(),
+                salespersonName
+            });
+        }
+    };
+    
+    const showPersonalBestNotification = (name, count) => {
+        playSound('achievement');
+        const popup = document.createElement('div');
+        popup.className = 'personal-best-popup';
+        popup.innerHTML = `
+            <div class="personal-best-content">
+                <h2>🏆 NEW PERSONAL BEST! 🏆</h2>
+                <p>${name} just set a new weekly record!</p>
+                <p class="count">${count} projects this week!</p>
+            </div>
+        `;
+        
+        const style = document.createElement('style');
+        style.textContent = `
+            .personal-best-popup {
+                position: fixed;
+                top: 20%;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 10003;
+                animation: best-appear 0.5s ease-out;
+            }
+            .personal-best-content {
+                background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+                padding: 2rem 3rem;
+                border-radius: 1rem;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                text-align: center;
+                color: white;
+            }
+            .personal-best-content h2 {
+                font-size: 2.5rem;
+                font-weight: bold;
+                margin-bottom: 0.5rem;
+            }
+            .personal-best-content .count {
+                font-size: 2rem;
+                font-weight: bold;
+                margin-top: 0.5rem;
+            }
+            @keyframes best-appear {
+                from { transform: translateX(-50%) translateY(-50px) scale(0.8); opacity: 0; }
+                to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+        document.body.appendChild(popup);
+        
+        triggerConfetti(200);
+        
+        setTimeout(() => {
+            popup.remove();
+            style.remove();
+        }, 4000);
+    };
     const addProjectToFirebase = async (salespersonId, projectTypeId, locationId) => { 
         const salesperson = SALESPERSONS.find(s => s.id === salespersonId);
         const projectType = PROJECT_TYPES.find(p => p.id === projectTypeId);
@@ -146,6 +331,46 @@ const AppProvider = ({ children }) => {
                 location: locationDetails.id, 
                 timestamp: serverTimestamp(),
             });
+            
+            // Update streak data
+            const today = new Date().toDateString();
+            const streakRef = doc(db, STREAKS_COLLECTION, 'teamStreak');
+            const streakDoc = await getDoc(streakRef);
+            
+            if (streakDoc.exists()) {
+                const data = streakDoc.data();
+                const lastDate = data.lastDate;
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                if (lastDate === today) {
+                    // Already logged today, no change
+                } else if (lastDate === yesterday.toDateString()) {
+                    // Continuing streak
+                    await updateDoc(streakRef, {
+                        currentStreak: data.currentStreak + 1,
+                        lastDate: today,
+                        bestStreak: Math.max(data.currentStreak + 1, data.bestStreak || 0)
+                    });
+                } else {
+                    // Streak broken, start new
+                    await updateDoc(streakRef, {
+                        currentStreak: 1,
+                        lastDate: today
+                    });
+                }
+            } else {
+                // First time
+                await setDoc(streakRef, {
+                    currentStreak: 1,
+                    lastDate: today,
+                    bestStreak: 1
+                });
+            }
+            
+            // Update personal best for salesperson
+            await updatePersonalBest(salespersonId, salesperson.name);
+            
             return true;
         } catch (error) {
             console.error("Error adding project: ", error);
@@ -263,6 +488,52 @@ const AppProvider = ({ children }) => {
             // First, try to save the weekly record
             const recordRef = await addDoc(collection(db, WEEKLY_RECORDS_COLLECTION), newRecord);
             
+            // Check if it's the end of month and crown a monthly champion
+            const today = new Date();
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+            
+            if (today.getMonth() !== tomorrow.getMonth()) {
+                // End of month - determine monthly champion
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                
+                // Get all projects for this month
+                const monthProjectsQuery = await getDocs(
+                    query(collection(db, PROJECTS_COLLECTION), 
+                    where('timestamp', '>=', monthStart),
+                    where('timestamp', '<=', monthEnd))
+                );
+                
+                const monthlyStats = {};
+                monthProjectsQuery.docs.forEach(doc => {
+                    const project = doc.data();
+                    monthlyStats[project.salespersonId] = (monthlyStats[project.salespersonId] || 0) + 1;
+                });
+                
+                // Find the champion
+                let championId = null;
+                let maxProjects = 0;
+                for (const [salespersonId, count] of Object.entries(monthlyStats)) {
+                    if (count > maxProjects) {
+                        maxProjects = count;
+                        championId = salespersonId;
+                    }
+                }
+                
+                if (championId) {
+                    const champion = SALESPERSONS.find(s => s.id === championId);
+                    const championRef = doc(db, APP_SETTINGS_COLLECTION, 'monthlyChampion');
+                    await setDoc(championRef, {
+                        salespersonId: championId,
+                        salespersonName: champion?.name || 'Unknown',
+                        projectCount: maxProjects,
+                        month: today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+                        crownedAt: serverTimestamp()
+                    });
+                }
+            }
+            
             // Only delete projects if the weekly record was successfully saved
             if (recordRef.id) {
                 // Backup projects before deletion
@@ -362,10 +633,122 @@ const AppProvider = ({ children }) => {
             salespersons: SALESPERSONS, projectTypes: PROJECT_TYPES, 
             logWeekAndResetBoard, updateWeeklyRecord: updateWeeklyRecordInDB, 
             isLoading, isProcessingWeek, isUpdatingTarget, isUpdatingRecord, 
-            locationsData: LOCATIONS, exportDataToJSON
+            locationsData: LOCATIONS, exportDataToJSON,
+            lastMilestone, setLastMilestone, streakData, achievements,
+            personalBests, monthlyChampion, liveUpdates, setLiveUpdates
         }}>
             {children}
         </AppContext.Provider>
+    );
+};
+
+// Live Update Notification Component
+const LiveUpdateNotification = ({ updates }) => {
+    const [visibleUpdates, setVisibleUpdates] = useState([]);
+    
+    useEffect(() => {
+        setVisibleUpdates(updates.slice(-3)); // Show last 3 updates
+    }, [updates]);
+    
+    if (visibleUpdates.length === 0) return null;
+    
+    return (
+        <div className="fixed bottom-4 right-4 space-y-2 z-[9999]">
+            {visibleUpdates.map((update, index) => (
+                <div
+                    key={update.id}
+                    className="bg-white shadow-lg rounded-lg p-4 border-2 border-blue-400 animate-slide-in-right"
+                    style={{
+                        animation: `slide-in-right 0.3s ease-out`,
+                        animationDelay: `${index * 0.1}s`
+                    }}
+                >
+                    <p className="font-semibold text-blue-700">{update.message}</p>
+                    <p className="text-sm text-gray-600">{update.time}</p>
+                </div>
+            ))}
+            <style jsx>{`
+                @keyframes slide-in-right {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+            `}</style>
+        </div>
+    );
+};
+
+// Streak Display Component
+const StreakDisplay = ({ streakData }) => {
+    if (!streakData || !streakData.currentStreak) return null;
+    
+    return (
+        <div className="fixed top-4 right-4 bg-white shadow-lg rounded-lg p-4 border-2 border-orange-400 z-[9998]">
+            <div className="flex items-center gap-2">
+                <span className="text-3xl">🔥</span>
+                <div>
+                    <p className="font-bold text-lg text-orange-600">{streakData.currentStreak} Day Streak!</p>
+                    <p className="text-sm text-gray-600">Best: {streakData.bestStreak || streakData.currentStreak} days</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Achievements Display Component
+const AchievementsDisplay = ({ achievements, expandable = true }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const unlockedAchievements = TEAM_ACHIEVEMENTS.filter(ach => 
+        achievements.some(a => a.id === ach.id)
+    );
+    
+    if (unlockedAchievements.length === 0) return null;
+    
+    return (
+        <div className={`bg-white shadow-lg rounded-lg border-2 border-purple-400 ${expandable ? 'fixed bottom-4 left-4 z-[9998]' : ''}`}>
+            <div 
+                className={`p-4 ${expandable ? 'cursor-pointer' : ''}`}
+                onClick={() => expandable && setIsExpanded(!isExpanded)}
+            >
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="text-2xl">🏆</span>
+                        <p className="font-bold text-lg text-purple-600">
+                            {unlockedAchievements.length} Achievement{unlockedAchievements.length !== 1 ? 's' : ''}
+                        </p>
+                    </div>
+                    {expandable && (
+                        <span className="text-gray-400">{isExpanded ? '▼' : '▶'}</span>
+                    )}
+                </div>
+            </div>
+            {(isExpanded || !expandable) && (
+                <div className="border-t border-purple-200 p-4 space-y-2 max-h-64 overflow-y-auto">
+                    {unlockedAchievements.map(ach => {
+                        const achievedData = achievements.find(a => a.id === ach.id);
+                        return (
+                            <div key={ach.id} className="flex items-start gap-3 p-2 bg-purple-50 rounded">
+                                <span className="text-2xl">{ach.icon}</span>
+                                <div className="flex-1">
+                                    <p className="font-semibold text-purple-700">{ach.name}</p>
+                                    <p className="text-sm text-gray-600">{ach.description}</p>
+                                    {achievedData && (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Achieved: {new Date(achievedData.achievedDate).toLocaleDateString()}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
     );
 };
 
@@ -426,6 +809,148 @@ const animateConfettiPiece = (piece) => {
 const triggerConfetti = (count = 150) => {
     for (let i = 0; i < count; i++) {
         setTimeout(() => { const piece = createConfettiPiece(); animateConfettiPiece(piece); }, i * 15);
+    }
+};
+
+// Sound effects system
+const playSound = (type) => {
+    const audio = new Audio();
+    switch(type) {
+        case 'drop':
+            // Simple click sound using Web Audio API
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+            break;
+        case 'milestone':
+            // Ascending chime for milestones
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            [523, 659, 784].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.1);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.3);
+                osc.start(ctx.currentTime + i * 0.1);
+                osc.stop(ctx.currentTime + i * 0.1 + 0.3);
+            });
+            break;
+        case 'achievement':
+            // Victory fanfare
+            const actx = new (window.AudioContext || window.webkitAudioContext)();
+            [523, 659, 784, 1047].forEach((freq, i) => {
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                osc.connect(gain);
+                gain.connect(actx.destination);
+                osc.frequency.setValueAtTime(freq, actx.currentTime + i * 0.15);
+                gain.gain.setValueAtTime(0.4, actx.currentTime + i * 0.15);
+                gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + i * 0.15 + 0.5);
+                osc.start(actx.currentTime + i * 0.15);
+                osc.stop(actx.currentTime + i * 0.15 + 0.5);
+            });
+            break;
+    }
+};
+
+// Enhanced celebration for different milestone levels
+const triggerMilestoneCelebration = (percentage, projectCount, weeklyGoal) => {
+    let celebrationLevel = 'small';
+    let message = '';
+    let confettiCount = 150;
+    
+    if (percentage >= 100) {
+        celebrationLevel = 'epic';
+        message = '🎉 GOAL ACHIEVED! AMAZING WORK TEAM! 🎉';
+        confettiCount = 300;
+        playSound('achievement');
+    } else if (percentage >= 75) {
+        celebrationLevel = 'large';
+        message = '🔥 75% THERE! FINAL PUSH! 🔥';
+        confettiCount = 200;
+        playSound('milestone');
+    } else if (percentage >= 50) {
+        celebrationLevel = 'medium';
+        message = '⭐ HALFWAY POINT! KEEP GOING! ⭐';
+        confettiCount = 150;
+        playSound('milestone');
+    } else if (percentage >= 25) {
+        celebrationLevel = 'small';
+        message = '✨ 25% COMPLETE! GREAT START! ✨';
+        confettiCount = 100;
+        playSound('milestone');
+    }
+    
+    if (message) {
+        // Create milestone popup
+        const popup = document.createElement('div');
+        popup.className = 'milestone-popup';
+        popup.innerHTML = `
+            <div class="milestone-content ${celebrationLevel}">
+                <h2>${message}</h2>
+                <p>${projectCount} of ${weeklyGoal} projects completed!</p>
+            </div>
+        `;
+        
+        // Add CSS dynamically
+        const style = document.createElement('style');
+        style.textContent = `
+            .milestone-popup {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 10002;
+                animation: milestone-appear 0.5s ease-out;
+            }
+            .milestone-content {
+                background: white;
+                padding: 2rem 3rem;
+                border-radius: 1rem;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                text-align: center;
+            }
+            .milestone-content h2 {
+                font-size: 2rem;
+                font-weight: bold;
+                margin-bottom: 0.5rem;
+                color: #1e40af;
+            }
+            .milestone-content.epic h2 {
+                font-size: 3rem;
+                background: linear-gradient(45deg, #f59e0b, #ef4444, #8b5cf6);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                animation: pulse 1s ease-in-out infinite;
+            }
+            @keyframes milestone-appear {
+                from { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+                to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            }
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+            }
+        `;
+        document.head.appendChild(style);
+        document.body.appendChild(popup);
+        
+        triggerConfetti(confettiCount);
+        
+        setTimeout(() => {
+            popup.remove();
+            style.remove();
+        }, 3000);
     }
 };
 const ProjectIcon = ({ project, onDragStart }) => ( 
@@ -635,7 +1160,9 @@ const WeeklyLogDisplay = () => {
 const InputPage = () => { 
     const { 
         addProject, salespersons, projectTypes, setCurrentPage, isLoading, 
-        isProcessingWeek, locationsData: locations, loggedProjects
+        isProcessingWeek, locationsData: locations, loggedProjects, weeklyGoal,
+        lastMilestone, setLastMilestone, liveUpdates, streakData, personalBests, 
+        achievements, monthlyChampion
     } = useContext(AppContext) || {}; 
 
     const [selectedSalesperson, setSelectedSalesperson] = useState(''); 
@@ -653,6 +1180,7 @@ const InputPage = () => {
         if (selectedSalesperson && projectId && locationId) {
             const success = await addProject(selectedSalesperson, projectId, locationId);
             if (success) {
+                playSound('drop');
                 const SProject = projectTypes.find(pt => pt.id === projectId);
                 const SPerson = salespersons.find(sp => sp.id === selectedSalesperson);
                 setCongratsData({
@@ -663,6 +1191,21 @@ const InputPage = () => {
                 });
                 triggerConfetti(150);
                 setTimeout(() => setCongratsData({ show: false, name: '', project: '', location: '' }), 3000);
+                
+                // Check for milestones
+                const newProjectCount = loggedProjects.length + 1;
+                const percentage = (newProjectCount / weeklyGoal) * 100;
+                const milestones = [25, 50, 75, 100];
+                
+                for (const milestone of milestones) {
+                    if (percentage >= milestone && lastMilestone < milestone) {
+                        setTimeout(() => {
+                            triggerMilestoneCelebration(milestone, newProjectCount, weeklyGoal);
+                            setLastMilestone(milestone);
+                        }, 3500); // Wait for regular celebration to finish
+                        break;
+                    }
+                }
             }
         } else if (!selectedSalesperson) {
             alert("Please select a salesperson first.");
@@ -683,7 +1226,10 @@ const InputPage = () => {
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-6 max-w-screen-xl"> 
+        <div className="container mx-auto p-4 md:p-6 max-w-screen-xl">
+            <LiveUpdateNotification updates={liveUpdates} />
+            <StreakDisplay streakData={streakData} />
+            <AchievementsDisplay achievements={achievements} /> 
             {congratsData.show && ( 
                 <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10000] p-4">
                     <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl text-center max-w-md w-full">
@@ -732,14 +1278,66 @@ const InputPage = () => {
                         <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Salesperson Leaderboard</h2>
                         {isLoading && salespersonStats.length === 0 ? <LoadingSpinner message="Loading leaderboard..." /> : salespersonStats.length > 0 ? (
                             <ul className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2"> 
-                                {salespersonStats.map((sp, index) => (
-                                    <li key={sp.id} className={`p-3 rounded-lg shadow flex justify-between items-center text-gray-700 ${index === 0 ? 'bg-yellow-100 border-yellow-400' : index === 1 ? 'bg-gray-200 border-gray-400' : index === 2 ? 'bg-orange-100 border-orange-400' : 'bg-white border-gray-300'}`}>
-                                        <span className="font-medium text-lg">{index + 1}. {sp.name} {index === 0 && '🥇'} {index === 1 && '🥈'} {index === 2 && '🥉'}</span>
-                                        <span className="font-bold text-xl">{sp.projectCount}</span>
-                                    </li>
-                                ))}
+                                {salespersonStats.map((sp, index) => {
+                                    const personalBest = personalBests[sp.id]?.weeklyBest || 0;
+                                    const isNewRecord = personalBest > 0 && sp.projectCount >= personalBest;
+                                    return (
+                                        <li key={sp.id} className={`p-3 rounded-lg shadow flex justify-between items-center text-gray-700 ${index === 0 ? 'bg-yellow-100 border-yellow-400' : index === 1 ? 'bg-gray-200 border-gray-400' : index === 2 ? 'bg-orange-100 border-orange-400' : 'bg-white border-gray-300'} ${monthlyChampion?.salespersonId === sp.id ? 'ring-2 ring-purple-500' : ''}`}>
+                                            <div>
+                                                <span className="font-medium text-lg">
+                                                    {index + 1}. {sp.name} 
+                                                    {index === 0 && '🥇'} 
+                                                    {index === 1 && '🥈'} 
+                                                    {index === 2 && '🥉'}
+                                                    {monthlyChampion?.salespersonId === sp.id && ' 👑'}
+                                                </span>
+                                                {personalBest > 0 && (
+                                                    <p className="text-xs text-gray-600">
+                                                        Personal Best: {personalBest} {isNewRecord && '🎯'}
+                                                    </p>
+                                                )}
+                                                {monthlyChampion?.salespersonId === sp.id && (
+                                                    <p className="text-xs text-purple-600 font-semibold">
+                                                        Monthly Champion!
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <span className="font-bold text-xl">{sp.projectCount}</span>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         ) : ( <p className="text-gray-600 text-center py-4">No projects logged yet.</p> )}
+                    </Card>
+                </div>
+                <div> 
+                    <Card className="bg-gray-50 h-full"> 
+                        <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Project Types This Week</h2>
+                        {(() => {
+                            const projectTypeCounts = PROJECT_TYPES.map(pt => ({
+                                ...pt,
+                                count: loggedProjects.filter(p => p.projectTypeId === pt.id).length
+                            })).sort((a, b) => b.count - a.count).filter(pt => pt.count > 0);
+                            
+                            return projectTypeCounts.length > 0 ? (
+                                <ul className="space-y-2">
+                                    {projectTypeCounts.map((pt, index) => (
+                                        <li key={pt.id} className="p-3 rounded-lg shadow bg-white flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                {isIconUrl(pt.icon) ? (
+                                                    <img src={pt.icon} alt={pt.name} className="w-8 h-8 object-contain" />
+                                                ) : (
+                                                    <span className="text-2xl">{pt.icon}</span>
+                                                )}
+                                                <span className="font-medium text-lg">{pt.name}</span>
+                                                {index === 0 && <span title="Most Popular!">🏆</span>}
+                                            </div>
+                                            <span className="font-bold text-xl">{pt.count}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : <p className="text-gray-600 text-center py-4">No projects logged yet.</p>;
+                        })()}
                     </Card>
                 </div>
             </div>
@@ -773,7 +1371,7 @@ const ProjectGridCell = ({ project, locationMap }) => {
 const DisplayPage = () => { 
     const { 
         loggedProjects, weeklyGoal, setCurrentPage, isLoading, 
-        isProcessingWeek, locationsData: locations 
+        isProcessingWeek, locationsData: locations, liveUpdates 
     } = useContext(AppContext) || {}; 
 
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -795,6 +1393,7 @@ const DisplayPage = () => {
 
     return ( 
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-2 sm:p-4 md:p-6 flex flex-col items-center justify-center">
+            <LiveUpdateNotification updates={liveUpdates} />
             <div className="w-full max-w-[2560px] h-full flex flex-col">
                 <header className="w-full mb-2 md:mb-4 text-center py-1 sm:py-2">
                     <div className="flex justify-between items-center mb-2 sm:mb-3 px-2">
