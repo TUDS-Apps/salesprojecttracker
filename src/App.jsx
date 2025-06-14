@@ -1175,12 +1175,13 @@ const WeeklyLogDisplay = () => {
 };
 
 const InputPage = () => { 
+    const contextData = useContext(AppContext) || {};
     const { 
-        addProject, salespersons, projectTypes, setCurrentPage, isLoading, 
-        isProcessingWeek, locationsData: locations, loggedProjects, weeklyGoal,
-        lastMilestone, setLastMilestone, liveUpdates, streakData, personalBests, 
-        achievements, monthlyChampion
-    } = useContext(AppContext) || {}; 
+        addProject, salespersons = [], projectTypes = [], setCurrentPage, isLoading = true, 
+        isProcessingWeek = false, locationsData: locations, loggedProjects = [], weeklyGoal = DEFAULT_WEEKLY_GOAL,
+        lastMilestone = 0, setLastMilestone, liveUpdates = [], streakData = {}, personalBests = {}, 
+        achievements = [], monthlyChampion = null
+    } = contextData; 
 
     const [selectedSalesperson, setSelectedSalesperson] = useState(''); 
     const [draggingOverBucket, setDraggingOverBucket] = useState(null);
