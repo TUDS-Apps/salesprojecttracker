@@ -489,14 +489,14 @@ const AppProvider = ({ children }) => {
             const recordRef = await addDoc(collection(db, WEEKLY_RECORDS_COLLECTION), newRecord);
             
             // Check if it's the end of month and crown a monthly champion
-            const today = new Date();
-            const tomorrow = new Date(today);
-            tomorrow.setDate(today.getDate() + 1);
+            const currentDate = new Date();
+            const tomorrow = new Date(currentDate);
+            tomorrow.setDate(currentDate.getDate() + 1);
             
-            if (today.getMonth() !== tomorrow.getMonth()) {
+            if (currentDate.getMonth() !== tomorrow.getMonth()) {
                 // End of month - determine monthly champion
-                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
                 
                 // Get all projects for this month
                 const monthProjectsQuery = await getDocs(
@@ -528,7 +528,7 @@ const AppProvider = ({ children }) => {
                         salespersonId: championId,
                         salespersonName: champion?.name || 'Unknown',
                         projectCount: maxProjects,
-                        month: today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+                        month: currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
                         crownedAt: serverTimestamp()
                     });
                 }
