@@ -1391,10 +1391,11 @@ const ProjectGridCell = ({ project, locationMap }) => {
     );
 };
 const DisplayPage = () => { 
+    const contextData = useContext(AppContext) || {};
     const { 
-        loggedProjects, weeklyGoal, setCurrentPage, isLoading, 
-        isProcessingWeek, locationsData: locations, liveUpdates 
-    } = useContext(AppContext) || {}; 
+        loggedProjects = [], weeklyGoal = DEFAULT_WEEKLY_GOAL, setCurrentPage, isLoading = true, 
+        isProcessingWeek = false, locationsData: locations, liveUpdates = []
+    } = contextData; 
 
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -1470,10 +1471,15 @@ const DisplayPage = () => {
 };
 function App() { 
     const appContextValue = useContext(AppContext); 
-    if (!appContextValue) {
+    if (!appContextValue || appContextValue.isLoading === undefined) {
         return <LoadingSpinner message="Initializing Application..." />; 
     }
-    const { currentPage } = appContextValue; 
+    const { currentPage, isLoading } = appContextValue;
+    
+    // Show loading spinner while main data is loading
+    if (isLoading && !currentPage) {
+        return <LoadingSpinner message="Loading application data..." />;
+    } 
 
     useEffect(() => {
         const handleHashChange = () => {
