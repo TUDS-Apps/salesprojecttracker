@@ -1047,7 +1047,7 @@ const AdminControls = () => {
 };
 
 const WeeklyLogDisplay = () => {
-    const { weeklyRecords, isLoading, updateWeeklyRecord, isUpdatingRecord } = useContext(AppContext); 
+    const { weeklyRecords, isLoading, updateWeeklyRecord, isUpdatingRecord, isProcessingWeek } = useContext(AppContext); 
     const [editingRecordId, setEditingRecordId] = useState(null);
     const [editFormData, setEditFormData] = useState({ completed: '', topSalespersonName: '', topSalespersonProjects: '' });
 
