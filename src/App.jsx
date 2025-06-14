@@ -514,6 +514,19 @@ const WeeklyLogDisplay = () => {
         }
     };
 
+    const handleDeleteRecord = async (recordId, weekDisplay) => {
+        if (window.confirm(`Are you sure you want to permanently delete the record for ${weekDisplay}? This cannot be undone.`)) {
+            try {
+                await deleteDoc(doc(db, WEEKLY_RECORDS_COLLECTION, recordId));
+                alert("Weekly record deleted successfully!");
+                setEditingRecordId(null);
+            } catch (error) {
+                console.error("Error deleting weekly record: ", error);
+                alert("Failed to delete weekly record.");
+            }
+        }
+    };
+
     if (isLoading && weeklyRecords.length === 0) { 
         return <LoadingSpinner message="Loading weekly records..." />;
     }
@@ -543,6 +556,7 @@ const WeeklyLogDisplay = () => {
                                     <div className="flex gap-2 mt-2">
                                         <Button onClick={() => handleSaveEdit(record.id)} variant="primary" className="py-1 px-3 text-xs" disabled={isUpdatingRecord}>{isUpdatingRecord ? "Saving..." : "Save"}</Button>
                                         <Button onClick={() => setEditingRecordId(null)} variant="secondary" className="py-1 px-3 text-xs">Cancel</Button>
+                                        <Button onClick={() => handleDeleteRecord(record.id, record.weekDisplay)} variant="danger" className="py-1 px-3 text-xs ml-auto">Delete</Button>
                                     </div>
                                 </div>
                             ) : (
